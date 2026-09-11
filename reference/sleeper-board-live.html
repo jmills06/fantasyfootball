@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sleeper League Board — Mockup v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Source+Sans+Pro:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#152333; --navy-dark:#0d1620; --navy-light:#1e3347;
+  --orange:#ff7030; --cream:#fdf8e5;
+  --cream-80:rgba(253,248,229,.8); --cream-50:rgba(253,248,229,.5);
+  --cream-30:rgba(253,248,229,.3);
+  --line:rgba(255,255,255,.10); --panel:rgba(255,255,255,.05);
+  --green:#2ecc71; --red:#e74c3c; --gold:#E0A52E;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-serif}
+#stage{
+  position:absolute;top:0;left:0;width:1080px;height:1920px;transform-origin:top left;
+  background:
+    radial-gradient(680px 420px at 88% 3%, rgba(255,112,48,.10), transparent 70%),
+    linear-gradient(180deg,var(--navy-dark) 0%,var(--navy) 42%,var(--navy-light) 100%);
+  color:var(--cream);display:flex;flex-direction:column;padding:34px 36px 26px;gap:18px;
+}
+
+/* header */
+.hdr{display:flex;align-items:flex-end;justify-content:space-between;flex:0 0 auto}
+.platform{font-family:'Oswald',sans-serif;font-size:17px;font-weight:500;
+  letter-spacing:.24em;color:var(--orange)}
+.hdr h1{font-family:'Oswald',sans-serif;font-weight:600;font-size:50px;line-height:1}
+.hdr .rt{display:flex;align-items:center;gap:16px}
+.wk{font-family:'Oswald',sans-serif;font-weight:500;font-size:29px;letter-spacing:.10em;
+  padding:9px 20px 7px;border-radius:8px;background:var(--orange);color:var(--navy-dark)}
+.live{display:flex;align-items:center;gap:9px;font-family:'Oswald',sans-serif;
+  font-size:21px;letter-spacing:.16em;color:var(--green)}
+.live .dot{width:12px;height:12px;border-radius:50%;background:var(--green);
+  animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.rule{height:2px;background:linear-gradient(90deg,var(--orange),rgba(255,112,48,0));flex:0 0 auto}
+
+.sec{display:flex;align-items:center;gap:14px;margin-bottom:11px}
+.sec span{font-family:'Oswald',sans-serif;font-size:19px;font-weight:500;
+  letter-spacing:.22em;color:var(--orange);white-space:nowrap}
+.sec i{flex:1;height:1px;background:linear-gradient(90deg,rgba(255,112,48,.5),rgba(255,112,48,0))}
+.blk{display:flex;flex-direction:column;flex:0 0 auto}
+.blk.grow{flex:1 1 auto;min-height:0}
+
+/* avatars */
+.av{border-radius:50%;overflow:hidden;flex:0 0 auto;background:rgba(255,255,255,.07);
+  border:2px solid rgba(255,255,255,.14);display:flex;align-items:center;
+  justify-content:center;font-family:'Oswald',sans-serif;font-weight:500;
+  color:var(--cream-50);letter-spacing:.04em}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.av.lg{width:112px;height:112px;font-size:38px}
+.av.lg.me{border-color:var(--orange)}
+.av.sm{width:34px;height:34px;font-size:14px}
+
+/* hero */
+.hero{border-radius:16px;padding:24px 28px 20px;border:2px solid var(--orange);
+  background:linear-gradient(160deg,rgba(255,112,48,.14),rgba(255,112,48,.03) 60%,transparent)}
+.hero .top{display:flex;align-items:stretch;gap:18px}
+.side{flex:1;display:flex;gap:18px;min-width:0}
+.side .txt{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.side .tag{font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.2em;color:var(--orange)}
+.side .nm{font-family:'Oswald',sans-serif;font-weight:500;font-size:32px;line-height:1.05;
+  color:var(--cream-80);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side .rec{font-size:19px;color:var(--cream-50)}
+.side .pts{font-family:'Oswald',sans-serif;font-weight:300;font-size:92px;line-height:1;
+  letter-spacing:-.02em;margin-top:2px}
+.side.right{flex-direction:row-reverse;text-align:right}
+.side.right .txt{align-items:flex-end}
+.mid{flex:0 0 68px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:8px}
+.mid .v{font-family:'Oswald',sans-serif;font-size:21px;letter-spacing:.16em;color:var(--cream-30)}
+.mid .delta{font-family:'Oswald',sans-serif;font-size:29px;font-weight:500}
+.up{color:var(--green)}.down{color:var(--red)}
+.bar{height:11px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden;
+  display:flex;margin-top:18px}
+.bar .a{background:var(--orange)}.bar .b{flex:1;background:rgba(253,248,229,.32)}
+
+/* lineup */
+.lu{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0;
+  justify-content:center}
+.luhead{display:grid;grid-template-columns:1fr 78px 1fr;gap:12px;padding:0 6px 6px;
+  align-items:center}
+.luhead .h{display:flex;align-items:center;gap:10px;min-width:0}
+.luhead .h.r{flex-direction:row-reverse}
+.luhead .h span{font-family:'Oswald',sans-serif;font-size:22px;letter-spacing:.06em;
+  color:var(--cream-50);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot{display:grid;grid-template-columns:1fr 78px 1fr;gap:12px;
+  flex:1 1 0;min-height:58px;max-height:92px}
+.cell{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:10px;
+  background:var(--panel);border:1px solid var(--line);min-width:0}
+.cell.r{flex-direction:row-reverse;text-align:right}
+.cell.win{background:linear-gradient(90deg,rgba(255,112,48,.18),rgba(255,112,48,.04));
+  border-color:rgba(255,112,48,.45)}
+.cell.r.win{background:linear-gradient(270deg,rgba(255,112,48,.18),rgba(255,112,48,.04))}
+.cell .p{font-family:'Oswald',sans-serif;font-weight:500;font-size:33px;
+  min-width:78px;flex:0 0 auto}
+.cell.r .p{text-align:left}
+.cell .n{flex:1;min-width:0;font-family:'Oswald',sans-serif;font-weight:400;font-size:27px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .n em{font-style:normal;font-size:19px;color:var(--cream-30);margin-left:8px;
+  letter-spacing:.08em}
+.cell.r .n em{margin:0 8px 0 0}
+.cell.empty{background:rgba(255,255,255,.02);border-style:dashed;
+  border-color:rgba(255,255,255,.16)}
+.cell.empty .p,.cell.empty .n{color:var(--cream-30)}
+.pos{display:flex;align-items:center;justify-content:center;
+  font-family:'Oswald',sans-serif;font-weight:500;font-size:21px;letter-spacing:.10em;
+  color:var(--cream-50);background:rgba(255,255,255,.04);border-radius:8px}
+.pos.flex{color:var(--gold)}
+.bench{display:flex;justify-content:space-between;align-items:center;
+  padding:14px 18px 0;font-family:'Oswald',sans-serif;font-size:22px;color:var(--cream-30)}
+.bench b{font-weight:400;color:var(--cream-50)}
+
+/* compact matchups */
+.mlist{display:flex;flex-direction:column;gap:9px}
+.m{display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:12px;
+  background:var(--panel);border:1px solid var(--line)}
+.m .t{flex:1;display:flex;align-items:center;gap:12px;min-width:0}
+.m .t.r{flex-direction:row-reverse}
+.m .t .n{font-family:'Oswald',sans-serif;font-size:26px;color:var(--cream-80);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.m .t .s{font-family:'Oswald',sans-serif;font-weight:500;font-size:32px;flex:0 0 auto}
+.m .t.lead .n,.m .t.lead .s{color:var(--orange)}
+.m .t .rec{font-family:'Oswald',sans-serif;font-size:24px;color:var(--cream-50);flex:0 0 auto}
+.m .sep{font-size:17px;color:var(--cream-30);flex:0 0 auto}
+
+/* standings */
+.thead,.trow{display:grid;grid-template-columns:52px 54px 1fr 126px 120px 94px;
+  align-items:center;gap:10px;padding:0 18px}
+.thead{font-family:'Oswald',sans-serif;font-size:16px;letter-spacing:.16em;
+  color:var(--cream-30);padding-bottom:5px}
+.tbl{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0;
+  justify-content:center}
+.trow{flex:1 1 0;min-height:58px;max-height:92px;border-radius:10px;
+  background:var(--panel);border-left:5px solid transparent}
+.trow.me{background:linear-gradient(90deg,rgba(255,112,48,.20),rgba(255,112,48,.04));
+  border-left-color:var(--orange)}
+.trow.playoff{border-left-color:rgba(46,204,113,.55)}
+.trow.me.playoff{border-left-color:var(--orange)}
+.rk{font-family:'Oswald',sans-serif;font-size:26px;color:var(--cream-50)}
+.tn{font-family:'Oswald',sans-serif;font-size:27px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.rc{font-family:'Oswald',sans-serif;font-size:26px;color:var(--cream-80)}
+.pf{font-family:'Oswald',sans-serif;font-weight:300;font-size:26px;color:var(--cream-80);
+  text-align:right}
+.stk{font-family:'Oswald',sans-serif;font-size:23px;text-align:right}
+
+/* moves */
+.moves{display:flex;flex-direction:column;gap:8px}
+.mv{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:10px;
+  background:var(--panel);border-left:6px solid var(--cream-30)}
+.mv.add{border-left-color:var(--green)}
+.mv.drop{border-left-color:var(--red)}
+.mv.trade{border-left-color:var(--gold)}
+.mv .kind{font-family:'Oswald',sans-serif;font-size:17px;letter-spacing:.16em;
+  width:100px;flex:0 0 auto;color:var(--cream-50)}
+.mv .txt{flex:1;font-size:22px;color:var(--cream-80);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.mv .txt b{color:var(--cream);font-weight:600}
+.mv .when{font-size:19px;color:var(--cream-30)}
+
+.ftr{display:flex;justify-content:space-between;font-size:18px;color:var(--cream-30);
+  flex:0 0 auto;padding-top:2px}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="hdr">
+    <div>
+      <div class="platform">SLEEPER</div>
+      <h1 id="leagueName"></h1>
+    </div>
+    <div class="rt">
+      <div class="live" id="liveFlag"><div class="dot"></div><span>LIVE</span></div>
+      <div class="wk" id="weekPill"></div>
+    </div>
+  </div>
+  <div class="rule"></div>
+
+  <div class="blk">
+    <div class="sec"><span id="heroLabel"></span><i></i></div>
+    <div class="hero">
+      <div class="top">
+        <div class="side" id="sideA"></div>
+        <div class="mid"><div class="v">VS</div><div class="delta" id="delta"></div></div>
+        <div class="side right" id="sideB"></div>
+      </div>
+      <div class="bar"><div class="a" id="barA"></div><div class="b"></div></div>
+    </div>
+  </div>
+
+  <div class="blk grow" id="swapZone"></div>
+
+  <div class="blk">
+    <div class="sec"><span id="mLabel"></span><i></i></div>
+    <div class="mlist" id="mlist"></div>
+  </div>
+
+  <div class="blk" id="movesBlk">
+    <div class="sec"><span>LATEST MOVES</span><i></i></div>
+    <div class="moves" id="moves"></div>
+  </div>
+
+  <div class="ftr"><div id="lid"></div><div id="stamp"></div></div>
+</div>
+
+<script>
+/* ============================================================
+   TUNING CONSTANTS
+   ============================================================ */
+const AUTO_FIT   = true;              // true for browser preview, false on DakBoard
+const LEAGUE_ID  = '1389343119928991744';
+const LIVE_DAYS  = [0];               // 0=Sun. Add 4 for Thu night, 1 for Mon night.
+const MODE_OVERRIDE = 'live';         // forced LIVE for this preview copy
+const TICK_MS    = 60000;             // master tick: re-evaluates mode and redraws
+
+const AVATAR_BASE = 'https://sleepercdn.com/avatars/';
+
+/* ============================================================
+   MOCK DATA — stands in for data/latest/sleeper.json
+   avatar: null renders the initials fallback
+   ============================================================ */
+const MOCK = {
+  league:'The Sunday Scaries', week:2, playoffCut:4,
+  hero:{
+    a:{ name:'Your Team',       rec:'1-0', pts:98.4, avatar:null, me:true },
+    b:{ name:'Gridiron Ghosts', rec:'0-1', pts:85.8, avatar:null }
+  },
+  lineup:[
+    { pos:'QB',   a:{n:'Jalen Hurts',        t:'PHI', p:24.6}, b:{n:'Jared Goff',        t:'DET', p:12.5} },
+    { pos:'RB',   a:{n:'Bijan Robinson',     t:'ATL', p:19.8}, b:{n:"De'Von Achane",     t:'MIA', p:10.1} },
+    { pos:'RB',   a:{n:'Kyren Williams',     t:'LAR', p:0.0 }, b:{n:'Josh Jacobs',       t:'GB',  p:16.4} },
+    { pos:'WR',   a:{n:'Puka Nacua',         t:'LAR', p:0.0 }, b:{n:'Amon-Ra St. Brown', t:'DET', p:19.2} },
+    { pos:'WR',   a:{n:'Nico Collins',       t:'HOU', p:20.8}, b:{n:'Jaylen Waddle',     t:'MIA', p:9.1 } },
+    { pos:'TE',   a:{n:'Trey McBride',       t:'ARI', p:0.0 }, b:{n:'Sam LaPorta',       t:'DET', p:9.4 } },
+    { pos:'FLEX', a:{n:'Jaxon Smith-Njigba', t:'SEA', p:16.6}, b:{empty:true, p:0.0} },
+    { pos:'K',    a:{n:'Jake Bates',         t:'DET', p:11.0}, b:{n:'Chris Boswell',     t:'PIT', p:9.0 } },
+    { pos:'DEF',  a:{n:'Texans D/ST',        t:'HOU', p:5.6 }, b:{n:'Ravens D/ST',       t:'BAL', p:0.0 } }
+  ],
+  bench:{ a:34.2, b:41.8 },
+  matchups:[
+    { a:{n:'Play Action Jackson',avatar:null}, pa:112.6, b:{n:'Chubb Rub',avatar:null},     pb:104.2 },
+    { a:{n:'Victorious Secret',  avatar:null}, pa:88.1,  b:{n:'Bijan Mustard',avatar:null}, pb:96.7  },
+    { a:{n:'Kittle Caesars',     avatar:null}, pa:121.3, b:{n:'Waddle Me This',avatar:null},pb:64.8  }
+  ],
+  upcoming:{ week:3, games:[
+    { a:{n:'Your Team',avatar:null,rec:'1-1',me:true}, b:{n:'Bijan Mustard',avatar:null,rec:'1-1'} },
+    { a:{n:'Play Action Jackson',avatar:null,rec:'2-0'}, b:{n:'Kittle Caesars',avatar:null,rec:'2-0'} },
+    { a:{n:'Chubb Rub',avatar:null,rec:'1-1'}, b:{n:'Gridiron Ghosts',avatar:null,rec:'0-2'} },
+    { a:{n:'Victorious Secret',avatar:null,rec:'1-1'}, b:{n:'Waddle Me This',avatar:null,rec:'0-2'} }
+  ]},
+  standings:[
+    { t:'Play Action Jackson', w:2,l:0, pf:238.4, s:'W2', avatar:null },
+    { t:'Kittle Caesars',      w:2,l:0, pf:229.1, s:'W2', avatar:null },
+    { t:'Bijan Mustard',       w:1,l:1, pf:211.7, s:'W1', avatar:null },
+    { t:'Your Team',           w:1,l:1, pf:204.9, s:'L1', avatar:null, me:true },
+    { t:'Chubb Rub',           w:1,l:1, pf:199.3, s:'L1', avatar:null },
+    { t:'Victorious Secret',   w:1,l:1, pf:180.8, s:'L1', avatar:null },
+    { t:'Gridiron Ghosts',     w:0,l:2, pf:171.5, s:'L2', avatar:null },
+    { t:'Waddle Me This',      w:0,l:2, pf:164.0, s:'L2', avatar:null }
+  ],
+  moves:[
+    { k:'add',   txt:'<b>Chubb Rub</b> claimed Tyjae Spears', when:'2h' },
+    { k:'trade', txt:'<b>Bijan Mustard</b> and <b>Kittle Caesars</b> swapped 2027 picks', when:'6h' },
+    { k:'drop',  txt:'<b>Waddle Me This</b> released Gus Edwards', when:'1d' },
+    { k:'add',   txt:'<b>Your Team</b> claimed Jaylen Warren', when:'2d' }
+  ]
+};
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function initials(name){
+  return name.split(/\s+/).filter(Boolean).slice(0,2)
+    .map(w=>w[0]).join('').toUpperCase();
+}
+/* three-tier avatar: custom team image -> manager avatar hash -> initials */
+function avatar(name, av, size, me){
+  const cls = 'av ' + size + (me?' me':'');
+  if(av){
+    const src = /^https?:/.test(av) ? av : AVATAR_BASE + (size==='sm'?'thumbs/':'') + av;
+    return '<div class="'+cls+'"><img src="'+src+'" alt="" '
+         + 'onerror="this.parentNode.textContent=\''+initials(name)+'\'"></div>';
+  }
+  return '<div class="'+cls+'">'+initials(name)+'</div>';
+}
+function currentMode(){
+  if(MODE_OVERRIDE) return MODE_OVERRIDE;
+  return LIVE_DAYS.includes(new Date().getDay()) ? 'live' : 'idle';
+}
+function fit(){
+  if(!AUTO_FIT) return;
+  const s = Math.min(innerWidth/1080, innerHeight/1920);
+  document.getElementById('stage').style.transform='scale('+s+')';
+  document.body.style.width=(1080*s)+'px';
+  document.body.style.height=(1920*s)+'px';
+  document.body.style.margin='0 auto';
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function heroSide(t, right){
+  return avatar(t.name, t.avatar, 'lg', t.me)
+    + '<div class="txt">'
+    + '<div class="tag"'+(right?' style="color:var(--cream-30)"':'')+'>'
+    + (right?'OPPONENT':'YOU')+'</div>'
+    + '<div class="nm">'+t.name+'</div>'
+    + '<div class="rec">'+t.rec+'</div>'
+    + '<div class="pts">'+t.pts.toFixed(1)+'</div></div>';
+}
+
+function renderLineup(){
+  const rows = MOCK.lineup.map(r=>{
+    const aw = r.a.p > r.b.p, bw = r.b.p > r.a.p;
+    const cell=(p,side,win)=>
+      p.empty
+      ? '<div class="cell empty'+(side==='b'?' r':'')+'">'
+        + '<div class="p">0.0</div><div class="n">Empty</div></div>'
+      : '<div class="cell'+(side==='b'?' r':'')+(win?' win':'')+'">'
+        + '<div class="p">'+p.p.toFixed(1)+'</div>'
+        + '<div class="n">'+p.n+'<em>'+p.t+'</em></div></div>';
+    return '<div class="slot">'+cell(r.a,'a',aw)
+      + '<div class="pos'+(r.pos==='FLEX'?' flex':'')+'">'+r.pos+'</div>'
+      + cell(r.b,'b',bw)+'</div>';
+  }).join('');
+  const h = MOCK.hero;
+  return '<div class="sec"><span>HEAD TO HEAD</span><i></i></div>'
+    + '<div class="luhead">'
+    + '<div class="h"><span>'+h.a.name+'</span></div>'
+    + '<div></div>'
+    + '<div class="h r"><span>'+h.b.name+'</span></div>'
+    + '</div><div class="lu">'+rows+'</div>'
+    + '<div class="bench"><b>'+MOCK.bench.a.toFixed(1)+'</b>'
+    + '<div>BENCH POINTS</div><b>'+MOCK.bench.b.toFixed(1)+'</b></div>';
+}
+
+function renderStandings(){
+  const rows = MOCK.standings.map((r,i)=>{
+    const cls='trow'+(r.me?' me':'')+(i<MOCK.playoffCut?' playoff':'');
+    const c = r.s[0]==='W'?'var(--green)':'var(--red)';
+    return '<div class="'+cls+'"><div class="rk">'+(i+1)+'</div>'
+      + '<div>'+avatar(r.t,r.avatar,'sm')+'</div>'
+      + '<div class="tn">'+r.t+'</div><div class="rc">'+r.w+'-'+r.l+'</div>'
+      + '<div class="pf">'+r.pf.toFixed(1)+'</div>'
+      + '<div class="stk" style="color:'+c+'">'+r.s+'</div></div>';
+  }).join('');
+  return '<div class="sec"><span>STANDINGS</span><i></i></div>'
+    + '<div class="thead"><div>#</div><div></div><div>TEAM</div><div>REC</div>'
+    + '<div style="text-align:right">PTS FOR</div><div style="text-align:right">STRK</div></div>'
+    + '<div class="tbl">'+rows+'</div>';
+}
+
+function render(){
+  const d=MOCK, live = currentMode()==='live';
+
+  document.getElementById('leagueName').textContent=d.league;
+  document.getElementById('weekPill').textContent='WEEK '+d.week;
+  document.getElementById('lid').textContent='LEAGUE '+LEAGUE_ID;
+  document.getElementById('liveFlag').style.display=live?'flex':'none';
+  document.getElementById('heroLabel').textContent=live?'YOUR MATCHUP':'WEEK '+d.week+' RESULT';
+  document.getElementById('mLabel').textContent =
+    live ? 'AROUND THE LEAGUE' : 'WEEK '+d.upcoming.week+' MATCHUPS';
+
+  document.getElementById('sideA').innerHTML=heroSide(d.hero.a,false);
+  document.getElementById('sideB').innerHTML=heroSide(d.hero.b,true);
+  const diff=d.hero.a.pts-d.hero.b.pts, dEl=document.getElementById('delta');
+  dEl.textContent=(diff>=0?'+':'')+diff.toFixed(1);
+  dEl.className='delta '+(diff>=0?'up':'down');
+  document.getElementById('barA').style.width=
+    (d.hero.a.pts/(d.hero.a.pts+d.hero.b.pts)*100).toFixed(1)+'%';
+
+  document.getElementById('swapZone').innerHTML = live ? renderLineup() : renderStandings();
+
+  document.getElementById('mlist').innerHTML = live
+    ? d.matchups.map(m=>{
+        const aLead=m.pa>=m.pb;
+        return '<div class="m">'
+          + '<div class="t '+(aLead?'lead':'')+'">'+avatar(m.a.n,m.a.avatar,'sm')
+          + '<span class="s">'+m.pa.toFixed(1)+'</span><span class="n">'+m.a.n+'</span></div>'
+          + '<div class="sep">VS</div>'
+          + '<div class="t r '+(!aLead?'lead':'')+'">'+avatar(m.b.n,m.b.avatar,'sm')
+          + '<span class="s">'+m.pb.toFixed(1)+'</span><span class="n">'+m.b.n+'</span></div></div>';
+      }).join('')
+    : d.upcoming.games.map(g=>{
+        const side=(t,right)=>'<div class="t'+(right?' r':'')+(t.me?' lead':'')+'">'
+          + avatar(t.n,t.avatar,'sm')
+          + '<span class="n">'+t.n+'</span><span class="rec">'+t.rec+'</span></div>';
+        return '<div class="m">'+side(g.a,false)
+          + '<div class="sep">VS</div>'+side(g.b,true)+'</div>';
+      }).join('');
+
+  document.getElementById('movesBlk').style.display=live?'none':'flex';
+  document.getElementById('moves').innerHTML=d.moves.map(m=>
+    '<div class="mv '+m.k+'"><div class="kind">'+m.k.toUpperCase()+'</div>'
+    + '<div class="txt">'+m.txt+'</div><div class="when">'+m.when+'</div></div>').join('');
+
+  const t=new Date();
+  document.getElementById('stamp').textContent='UPDATED '+
+    t.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).toUpperCase();
+}
+
+addEventListener('resize',fit);
+fit(); render();
+setInterval(render, TICK_MS);   // single master tick handles mode flip + redraw
+</script>
+</body>
+</html>
