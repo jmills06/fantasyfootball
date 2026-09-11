@@ -1,152 +1,230 @@
 # Discovery findings
 
-**Run:** 2026-09-11 17:55 UTC, from the Claude Code remote container
-(Linux, Python 3.11.15), not from the owner's machine.
-**Script:** `discover.py` (unmodified, default args)
-**Manifest:** `discovery/_manifest.json`
+**Sleeper run:** 2026-09-11 18:03 UTC, owner's machine (Windows, Python
+3.14.2, `truststore: injected`). 11 ok, 0 failed, 1 skipped.
+**ESPN run:** not yet completed.
+**Script:** `discover.py --only sleeper`
+
+An earlier run from the Claude Code remote container failed entirely (both
+API hosts blocked by that container's egress policy). Everything below comes
+from the owner's machine.
+
+---
 
 ## Headline
 
-**Nothing was confirmed. Zero endpoints returned data.** Every unknown in
-handoff section 6 is still an unknown. Discovery has to be re-run from the
-owner's machine before any collector or board code is written.
+Sleeper is fully captured and **the handoff's Sleeper assumptions are wrong in
+ways that change the layout.** The lineup grid is 10 rows, not 9, there is no
+kicker, and the league is a dynasty league with FAAB - none of which the
+handoff anticipated.
 
-This is an environment failure, not an API failure. Nothing here says
-anything about whether the endpoints in `discover.py` are correct.
+ESPN is still entirely unverified.
 
-| | |
+---
+
+## Sleeper - confirmed, wrong, and still unknown
+
+League `1389343119928991744`, name **"Laces Out"**, season 2026,
+`season_type: regular`, captured at `week=1 display_week=1`.
+
+### WRONG - assumptions the data contradicts
+
+**1. `roster_positions` is 10 starting slots, not 9, and there is no kicker.**
+
+Actual:
+
+```
+QB, RB, RB, WR, WR, WR, TE, FLEX, FLEX, DEF
+```
+
+then 12 `BN`. The handoff assumed `QB/RB/RB/WR/WR/TE/FLEX/K/DEF`. Three
+differences: **3 WR not 2**, **2 FLEX not 1**, **no K slot at all**.
+
+Consequences:
+
+- The lineup grid is 10 rows on both boards, not 9 on Sleeper and 10 on ESPN.
+  The two boards line up better than the handoff expected.
+- There are **two** gold FLEX rows, not one.
+- Any kicker handling in the mockup comes out.
+- Scoring settings still contain kicker scoring (`fgm_*`, `xpm`). Ignore it;
+  the roster has no K slot.
+
+**2. This is a dynasty league. The handoff never mentions it.**
+
+`settings.type: 2` (dynasty), plus `taxi_slots: 3`, `taxi_years: 2`,
+`draft_rounds: 5` (rookie draft), `max_keepers: 1`, and
+`previous_league_id: "1225620718889222144"`.
+
+Consequences:
+
+- Rosters carry a populated `taxi` array and a `reserve` array. Both are
+  outside the 22 `roster_positions` slots and must not leak into the lineup
+  grid or a bench total.
+- `players` includes taxi and IR players, so roster length runs 25-28.
+- The week 1 transaction list is mostly **offseason dynasty cuts**, not
+  in-season activity - see the transactions section below.
+
+**3. `previous_league_id` exists, so Sleeper history is not impossible.**
+
+Handoff section 11 says all-time records are "possible on the ESPN board and
+impossible on the Sleeper one". That is not correct: `previous_league_id`
+chains back to the prior season's league, which chains back again. Same
+out-of-scope-for-v1 call as ESPN, but the reasoning in section 11 should be
+corrected rather than carried forward as fact.
+
+**4. Scoring differs from ESPN in ways worth knowing.**
+
+`rec: 0.5` (**half PPR**, not full PPR like ESPN), `pass_td: 6` (ESPN is 4),
+`pass_yd: 0.04`. Does not affect the renderer, but do not assume the leagues
+score alike when sanity-checking numbers.
+
+### CONFIRMED - assumptions that held
+
+| Assumption | Result |
 |---|---|
-| Endpoints attempted | 8 |
-| Succeeded | 0 |
-| Failed (network) | 8 |
-| Skipped (no precondition) | 4 |
+| 8 teams | Confirmed. `total_rosters: 8`, 8 users, 8 rosters. |
+| Playoffs are 4 of 8 | **Confirmed.** `playoff_teams: 4`. The mockup's green-border treatment on 4 of 8 stands. |
+| `playoff_week_start` | **15**, so regular season is weeks 1-14. Same shape as ESPN. |
+| `starters` is slot-ordered and identical across teams | Confirmed. All 8 rosters have exactly 10 entries, same order, DEF always last. The head-to-head grid aligns row by row with no matching logic. |
+| Points split across two integer fields | Fields exist (`fpts`, `fpts_decimal`), both 0 pre-scoring. The split is real; recombination is untestable until scores land. |
+| Win/loss streak is not in the API | Confirmed. Roster settings carry `wins`/`losses`/`ties` only. "W2" must be computed by walking prior weeks. |
+| Not all managers set a `team_name` | Confirmed, and it matters - see below. |
 
-## Why it failed
+### James's identity
 
-Two independent blockers, one per platform.
+`user_id 78845084879437824` (`jmills06`) → `owner_id` → **`roster_id: 1`**,
+team name **"Jake's Predecessor"**. Everything `"me"` keys off roster 1.
 
-### Sleeper - blocked by the session's egress policy
+Week 1 pairings by `matchup_id`: **1 v 6**, 2 v 7, 3 v 5, 4 v 8. James's week
+1 opponent is roster 6.
 
-All 8 Sleeper calls failed identically:
+### Team names and avatars
 
-```
-network error: Tunnel connection failed: 403 Forbidden
-```
+7 of 8 managers set a `team_name`. **Roster 2 did not** - the display-name
+fallback in the handoff is required, not theoretical.
 
-This container routes outbound HTTPS through an agent proxy that enforces an
-organization allowlist. `api.sleeper.app:443` is not on it, so the CONNECT
-tunnel is refused before any request is sent. The proxy's own status endpoint
-confirms it (`kind: connect_rejected`, "the egress proxy denied the CONNECT
-(organization policy)"). `lm-api-reads.fantasy.espn.com:443` is refused the
-same way.
+Avatar resolution, in order:
 
-Retries (3 attempts, exponential backoff) were spent and made no difference -
-a policy denial is not transient. This was not worked around, per the
-environment's own rule about not routing around policy denials.
+1. `metadata.avatar` - a full custom upload URL on `sleepercdn.com/uploads/`.
+   Present for **5 of 8** (rosters 1, 4, 5, 6, 7).
+2. `avatar` - a hash, rendered as
+   `https://sleepercdn.com/avatars/thumbs/{hash}`. Present for all 8.
+3. Initials.
 
-### ESPN - no credentials, and the host is blocked anyway
+With that precedence, **the initials fallback never fires in this league.**
+One caveat: the `avatar` hashes are not unique - two hashes are shared across
+five users, so they are Sleeper defaults rather than personal images. The
+three rosters that fall through to step 2 do not collide with each other, so
+no two teams render the same picture. If a default-looking avatar is worse
+than initials visually, that is a design call to make when the board is built,
+not a data problem.
 
-`ESPN_S2` and `ESPN_SWID` are not set in this container, so every ESPN
-endpoint was skipped before a request was attempted. Discovery correctly
-refused to guess. Separately, a forced probe confirmed the ESPN host is
-blocked by the same egress policy, so supplying cookies here would not have
-helped - and the cookies should not be pasted into a remote container
-regardless.
+### FAAB - answers an open question from section 11
 
-## Section 6 unknowns: current status
+**Yes, the league uses FAAB.** `waiver_type: 2`, `waiver_budget: 200` (not
+$100 like ESPN), `waiver_clear_days: 2`, `waiver_day_of_week: 2`. Every roster
+carries `waiver_budget_used`, currently 0.
 
-Every row is unresolved. The "what resolves it" column is the endpoint
-already wired into `discover.py`.
+A budget block on the Sleeper IDLE board is viable and the handoff's
+suggestion to add one should be taken up.
 
-### Sleeper (league `1389343119928991744`)
+### Per-player points come free - no stats endpoint needed
 
-| Unknown (handoff section 6) | Status | What resolves it |
-|---|---|---|
-| `roster_positions` - mockup assumes 9 slots (QB/RB/RB/WR/WR/TE/FLEX/K/DEF) | **Unresolved** | `sleeper__league` |
-| James's `roster_id` (match `user_id` -> `owner_id`) | **Unresolved** | `sleeper__users` + `sleeper__rosters` |
-| `settings.playoff_week_start`, playoff team count (mockup assumed 4 of 8) | **Unresolved** | `sleeper__league` |
-| Manager avatars / custom team image in `metadata` | **Unresolved** | `sleeper__users` |
-| Whether all 8 managers set `team_name` | **Unresolved** | `sleeper__users` |
-| Whether the league uses FAAB | **Unresolved** | `sleeper__league` (`settings.waiver_type` / `waiver_budget`) |
-| 8 teams (stated by James, never verified) | **Unresolved** | `sleeper__rosters` (length) |
-| `fpts` / `fpts_decimal` split is real | **Unresolved** | `sleeper__rosters` |
-| `starters` is slot-ordered and identical across teams | **Unresolved** | `sleeper__matchups_w{n}` |
-| `0` in `starters` means an empty slot | **Unresolved** | `sleeper__matchups_w{n}` |
-| `week` vs `display_week` divergence | **Unresolved** | `sleeper__state_nfl` |
-| Transactions include failed waiver claims | **Unresolved** | `sleeper__transactions_w{n}` |
-| Postseason pairings live in `winners_bracket` | **Unresolved** | `sleeper__winners_bracket` |
+`/matchups/{week}` returns **both**:
 
-The handoff is explicit that the entire Sleeper half is unverified
-assumption. It still is. Nothing in the Sleeper section should be treated as
-fact when writing `config/leagues.json`.
+- `starters_points` - a float array parallel to `starters`, so the grid can be
+  populated directly, and
+- `players_points` - a per-player map covering bench too.
 
-### ESPN (league `1529795`, season 2026)
+`points` equals the sum of `starters_points`. Verified on roster 1: starters
+sum 22.2, `points` 22.2, while bench players scoring 6.7 and 4.1 are correctly
+excluded.
 
-| Unknown (handoff section 6) | Status | What resolves it |
-|---|---|---|
-| **Which view returns per-player live points** - the biggest ESPN unknown | **Unresolved** | `espn__mBoxscore_sp{n}`, `espn__mBoxscore_mRoster_sp{n}`, `espn__mRoster_sp{n}` |
-| How to retrieve transactions (`mTransactions2` + `x-fantasy-filter`) | **Unresolved** | `espn__mTransactions2`, `espn__mTransactions2_nofilter` |
-| Whether custom team logos load without auth (`mystique-api` host) | **Unresolved** | `logo__*__nocookie` probes (cookie-free, exactly what the board's `<img>` does) |
-| Whether `totalProjectedPointsLive` populates during games | **Unresolved** | `espn__mBoxscore_sp{n}` mid-game vs pre-kickoff |
-| Whether stacked views differ from separate views (section 7 warning) | **Unresolved** | `espn__combo_*` vs the individual `espn__{view}` captures |
-| The section 6 table facts (12 teams, sparse IDs, 10 slots, 7-of-12 playoffs, $100 FAAB, `isPublic: false`) | **Not re-verified** | `espn__mSettings`, `espn__mTeam`, `espn__mStandings` |
+This fully satisfies the LIVE board with no call to Sleeper's undocumented
+stats endpoint. The section 10 decision to avoid that endpoint costs nothing.
 
-The section 6 ESPN table is marked "confirmed" in the handoff from an earlier
-session. This run neither confirmed nor contradicted any of it. Treat it as
-prior evidence, not as something this discovery run stands behind.
+Bench totals for the `bench` field must be computed as
+`sum(players_points) - sum(starters_points)`, and must exclude taxi and IR
+players or the number will be wrong.
 
-## Endpoints that failed, individually
+### Transactions - usable, but week 1 is misleading
 
-All Sleeper failures are the same policy denial, not distinct API problems:
+36 transactions in week 1. All are `type: "free_agent"`, all
+`status: "complete"`. Notable:
 
-- `sleeper__state_nfl`, `sleeper__league`, `sleeper__users`,
-  `sleeper__rosters`, `sleeper__winners_bracket`, `sleeper__losers_bracket`,
-  `sleeper__traded_picks`, `sleeper__drafts` - all `Tunnel connection
-  failed: 403 Forbidden`.
+- **`metadata` is null on every one.** There is no display text. Rendering
+  "Team claimed Player" requires the player-ID lookup from
+  `collect_players.py`. The moves block is blocked on that file.
+- Many are **drops with `adds: null`** - dynasty offseason cuts. The renderer
+  needs an add-only, drop-only, and add+drop case.
+- Timestamps run back weeks before the season. Sleeper files all dynasty
+  offseason activity under `leg: 1`, so the week 1 "latest moves" block will
+  show stale offseason cuts rather than recent activity. Sorting by `created`
+  descending and capping the list handles it.
+- **No waiver claims and no failed claims exist yet**, so the handoff's
+  "includes failed waiver claims, filter on status" warning is unverified.
+  Keep the status filter regardless.
 
-Skipped, with reasons recorded in the manifest:
+### winners_bracket is already populated and cannot be trusted
 
-- `sleeper__matchups_*` and `sleeper__transactions_*` - week-dependent, and
-  `/v1/state/nfl` never returned a week. A `--week N` run exercises them.
-- `sleeper__players_nfl` - opt-in only (`--with-players`), since it is ~5MB.
-- `espn__*` - `ESPN_S2` / `ESPN_SWID` missing from the environment.
+At week 1, before a single game has finished, `/winners_bracket` returns a
+complete 4-team bracket with concrete roster IDs assigned to round 1
+(`m1: 8 v 3`, `m2: 4 v 7`), plus a final (`p: 1`) and a third-place game
+(`p: 3`).
 
-## What the run did establish
+This cannot be real 2026 seeding - the season has not been played. It is
+either carried over from the previous dynasty league or pre-seeded from
+all-zero standings. Either way:
 
-Only that the script itself behaves. All paths were exercised, including a
-forced ESPN run with throwaway placeholder values to drive the cookie branch:
+**Gate any bracket use on `week >= playoff_week_start` (15).** Reading it
+before then will render a fabricated playoff picture. Re-check this endpoint
+in week 15 before trusting it.
 
-- No crashes on total network failure; every endpoint failed independently
-  and the run completed.
-- Missing credentials skip ESPN cleanly instead of firing unauthenticated
-  requests.
-- Week-dependent endpoints skip with a recorded reason when no week is
-  available, and fire correctly under `--week`.
-- **Security rules hold.** No cookie value, no cookie dict, no request
-  header, and no failed response body was printed or written. Failures
-  record status code, failure kind, and transport reason only. The manifest
-  was grepped for cookie and header terms; the only hit is the literal
-  variable *names* in the message "ESPN_S2/ESPN_SWID not in environment".
-- `HTTPError` bodies are never read. On 401/403, the status code is recorded
-  and the body is deliberately discarded unread, per handoff section 4.
+`losers_bracket` returns the same shape and gets the same treatment.
 
-One note for the owner's machine: `truststore` is not installed here, so the
-script logged `truststore: not installed (using default SSL context)` and
-continued. On the owner's machine it should log `truststore: injected`. If it
-does not, install it before trusting any HTTPS result.
+Also in league `metadata`: `latest_league_winner_roster_id: "8"`, the previous
+season's champion. Free defending-champ marker if wanted.
 
-## Next step
+### Still unknown on Sleeper
 
-Re-run from the owner's machine, where both hosts are reachable:
+| Unknown | Why it is still open |
+|---|---|
+| A `0` in `starters` meaning an empty slot | **Not observed.** All 8 rosters are fully set. Keep the dashed-border empty row handling, but it is untested. |
+| `fpts_against` recombination | The `fpts_against` / `fpts_against_decimal` keys are **absent** from roster settings right now. They presumably appear once games score. Re-check after week 1 completes. |
+| `week` vs `display_week` divergence | Both read 1. The Tuesday divergence cannot be observed until a week completes. |
+| Next week's pairings with zeroed points | `matchups/2` returned 8 entries and was captured, but the contents were not reviewed in this pass. |
+| Streak computation | Needs at least two completed weeks of matchup data to test the walk. |
+| `/v1/players/nfl` shape | Skipped - opt-in via `--with-players`. Needed before the moves block can render. |
 
-```
-py discover.py --only sleeper          # needs no auth, do this first
-py discover.py                         # both, after ESPN_S2/ESPN_SWID are set
-```
+---
 
-Set `ESPN_S2` and `ESPN_SWID` in the environment and **open a fresh terminal**
-before the second command - an already-open terminal will not see them.
+## ESPN - not yet run
 
-Then replace this file with the real findings before writing
-`config/leagues.json` or any collector. Build order in handoff section 2 is
-gated on it.
+Every section 6 ESPN unknown remains open:
+
+| Unknown | Status |
+|---|---|
+| Which view returns per-player live points | **Unresolved** |
+| How to retrieve transactions (`mTransactions2` + `x-fantasy-filter`) | **Unresolved** |
+| Whether custom team logos load without auth (`mystique-api` host) | **Unresolved** |
+| Whether `totalProjectedPointsLive` populates during games | **Unresolved** |
+| Whether stacked views differ from views called separately | **Unresolved** |
+| The section 6 table facts (12 teams, sparse IDs, 10 slots, 7-of-12 playoffs, $100 FAAB) | **Not re-verified** |
+
+Run `py discover.py` with `ESPN_S2` and `ESPN_SWID` set to close these out.
+
+---
+
+## Impact on the build
+
+Before `config/leagues.json` or any collector is written:
+
+1. The Sleeper lineup grid is **10 rows with two FLEX and no K**. The mockup's
+   9-row assumption is dead.
+2. `roster_id: 1` is James on Sleeper.
+3. `playoffCut` is **4** for Sleeper, 7 for ESPN.
+4. Taxi and IR players must be excluded from bench totals.
+5. The moves block depends on `collect_players.py` landing first, because
+   transaction `metadata` is null.
+6. Bracket endpoints are gated on week 15.
+7. A FAAB budget block ($200) is worth adding to the Sleeper IDLE board.
