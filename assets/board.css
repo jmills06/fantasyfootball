@@ -94,7 +94,7 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 .luhead .h span{font-family:'Oswald',sans-serif;font-size:22px;letter-spacing:.06em;
   color:var(--cream-50);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slot{display:grid;grid-template-columns:1fr 78px 1fr;gap:12px;
-  flex:1 1 0;min-height:58px;max-height:92px}
+  flex:1 1 0;min-height:var(--row-min,58px);max-height:var(--row-max,92px)}
 .cell{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:10px;
   background:var(--panel);border:1px solid var(--line);min-width:0}
 .cell.r{flex-direction:row-reverse;text-align:right}
@@ -142,7 +142,8 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
   color:var(--cream-30);padding-bottom:5px}
 .tbl{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0;
   justify-content:center}
-.trow{flex:1 1 0;min-height:58px;max-height:92px;border-radius:10px;
+.trow{flex:1 1 0;min-height:var(--row-min,58px);max-height:var(--row-max,92px);
+  border-radius:10px;
   background:var(--panel);border-left:5px solid transparent}
 .trow.me{background:linear-gradient(90deg,rgba(255,112,48,.20),rgba(255,112,48,.04));
   border-left-color:var(--orange)}
@@ -190,6 +191,26 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 .trow.cut{position:relative}
 .trow.cut::after{content:'';position:absolute;left:0;right:0;bottom:-5px;height:2px;
   background:linear-gradient(90deg,rgba(255,112,48,.55),rgba(255,112,48,0))}
+
+/* Swap-zone rows are flex:1 1 0 inside a justify-content:center container.
+   That is what stops slack pooling into a dead band under the last row, but it
+   also means content taller than the container spills out BOTH ends and
+   collides with the section headers. --row-min lets a 12-team board lower the
+   floor so 12 rows fit; the overflow guard keeps a future miscalculation from
+   drawing over the headers. Never replace these with fixed row heights. */
+.lu,.tbl{overflow:hidden}
+
+/* Denser matchup strip. 12 teams means 6 upcoming pairings rather than 4, and
+   at full size they crowd the standings out of the swap zone. */
+.mlist.compact .m{padding:7px 18px}
+.mlist.compact .m .t .n{font-size:23px}
+.mlist.compact .m .t .s{font-size:28px}
+.mlist.compact .m .t .rec{font-size:21px}
+
+/* Projected points under the hero score. ESPN only - Sleeper never emits
+   proj, so the element is simply not rendered there. */
+.side .proj{font-family:'Oswald',sans-serif;font-size:19px;letter-spacing:.10em;
+  color:var(--cream-30);margin-top:2px}
 
 /* Stale indicator. Small and quiet - it means the data is old, not broken,
    and a blank screen is the failure mode being avoided. */
