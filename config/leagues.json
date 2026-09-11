@@ -1,0 +1,67 @@
+{
+  "_comment": "Built from discovery/FINDINGS.md, 2026-09-11. No credentials belong in this file - ESPN cookies are read from ESPN_S2 and ESPN_SWID in the environment only. Values that the API reports authoritatively (Sleeper roster_positions, team names, records) are NOT duplicated here; collectors read them live. This file holds identity, display choices, and the few facts the APIs do not provide.",
+
+  "sleeper": {
+    "platform": "sleeper",
+    "league": "Laces Out",
+    "leagueId": "1389343119928991744",
+    "season": "2026",
+    "base": "https://api.sleeper.app",
+    "me": {
+      "userId": "78845084879437824",
+      "rosterId": 1
+    },
+    "playoffCut": 4,
+    "playoffWeekStart": 15,
+    "regularSeasonWeeks": 14,
+    "faab": {
+      "enabled": true,
+      "budget": 200
+    },
+    "_notes": {
+      "slots": "roster_positions is an ordered array from the API - QB,RB,RB,WR,WR,WR,TE,FLEX,FLEX,DEF - so the collector reads it live rather than hardcoding it here. 10 starting slots, two FLEX, no kicker.",
+      "rosterId": "Derived at runtime by matching me.userId to owner_id. The value here is a cached hint and a cross-check; the collector warns if they disagree.",
+      "dynasty": "Dynasty league. taxi and reserve players sit outside roster_positions and are excluded from bench totals.",
+      "bracket": "winners_bracket and losers_bracket return fabricated pairings before the playoffs. Gated on playoffWeekStart."
+    }
+  },
+
+  "espn": {
+    "platform": "espn",
+    "league": "ZFL",
+    "leagueId": "1529795",
+    "season": 2026,
+    "base": "https://lm-api-reads.fantasy.espn.com",
+    "me": {
+      "teamId": 9
+    },
+    "playoffCut": 7,
+    "playoffWeekStart": 15,
+    "regularSeasonWeeks": 14,
+    "faab": {
+      "enabled": true,
+      "budget": 100
+    },
+    "slotOrder": [0, 2, 2, 4, 4, 6, 23, 7, 16, 17],
+    "slotNames": {
+      "0": "QB",
+      "2": "RB",
+      "4": "WR",
+      "6": "TE",
+      "7": "SFLEX",
+      "16": "D/ST",
+      "17": "K",
+      "20": "BN",
+      "21": "IR",
+      "23": "FLEX"
+    },
+    "mirrorLogoHosts": ["mystique-api.fantasy.espn.com"],
+    "logoMirrorDir": "assets/logos/espn",
+    "_notes": {
+      "slotOrder": "ESPN returns lineupSlotCounts as an unordered map, unlike Sleeper's ordered array, so the display order is a choice made here. 10 rows: QB, RB, RB, WR, WR, TE, FLEX, SUPERFLEX, D/ST, K.",
+      "mirrorLogoHosts": "Logos on mystique-api return 401 without cookies and the board loads images client-side, so the collector mirrors those into logoMirrorDir. 4 of 12 teams are affected, including me.",
+      "standings": "12 rows, so points-for is replaced by playoff percentage and a divider is drawn between seed 7 and 8 rather than highlighting 7 of 12 rows.",
+      "transactions": "view=mTransactions2 with no x-fantasy-filter header. Filtering server-side returns 400. DRAFT records are filtered out client-side."
+    }
+  }
+}
