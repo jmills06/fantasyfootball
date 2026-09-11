@@ -32,6 +32,7 @@ OUT = ROOT / "data" / "latest" / "sleeper.json"
 PLAYERS = ROOT / "data" / "latest" / "players.json"
 UA = "Mozilla/5.0 (compatible; fantasyfootball-collector/1.0)"
 MOVES_CAP = 8
+MOVES_MAX_AGE_DAYS = 7   # only the last week of activity is interesting
 
 # Slots that are not part of the starting lineup.
 BENCH_SLOTS = {"BN", "TAXI", "IR"}
@@ -354,9 +355,14 @@ def build(cfg, players):
             print(f"WARNING: transactions week {w} unavailable ({e})")
     tx.sort(key=lambda t: t.get("created") or 0, reverse=True)
 
+    cutoff_ms = (time.time() - MOVES_MAX_AGE_DAYS * 86400) * 1000
     for t in tx:
         if t.get("status") != "complete":
             continue  # drops failed waiver claims
+        if (t.get("created") or 0) < cutoff_ms:
+            # Sleeper files dynasty offseason cuts under leg 1, so without this
+            # a quiet week shows moves from weeks ago.
+            continue
         kind = t.get("type")
         adds, drops = t.get("adds") or {}, t.get("drops") or {}
         rids = t.get("roster_ids") or []
