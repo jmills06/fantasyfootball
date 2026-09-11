@@ -1,0 +1,30 @@
+# Raw discovery dumps. Never commit these: they contain full raw API
+# responses from a private ESPN league, and this repo is public.
+# Rule from handoff section 4 - this entry must exist before discover.py
+# is ever run.
+discovery/*
+
+# FINDINGS.md is hand-written prose summarising discovery. It carries no
+# raw responses, no cookies, no headers. It is the review artifact, so it
+# is the one thing under discovery/ that is tracked.
+!discovery/FINDINGS.md
+
+# Never commit credentials in any form.
+.env
+.env.*
+*.cookies
+secrets.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
