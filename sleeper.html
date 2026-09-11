@@ -98,11 +98,12 @@ function initials(name){
     .map(w => w[0]).join('').toUpperCase() || '?';
 }
 
-/* Collector emits an absolute logo URL or null. A dead or auth-walled image
-   falls back to initials rather than leaving a hole. */
+/* Collector emits either an absolute URL or a repo-relative path, for logos
+   it had to mirror because they need auth. Both are used as-is; only a null
+   or a load failure falls back to initials. */
 function avatar(name, logo, size, me){
   const cls = 'av ' + size + (me ? ' me' : '');
-  if (logo && /^https?:/.test(logo)){
+  if (typeof logo === 'string' && logo.trim()){
     return '<div class="' + cls + '"><img src="' + esc(logo) + '" alt="" '
          + 'onerror="this.parentNode.textContent=\'' + initials(name) + '\'"></div>';
   }
@@ -194,7 +195,11 @@ function renderLineup(d){
 function renderStandings(d){
   const budget = (d.faab && d.faab.budget) || 0;
   const rows = (d.standings || []).map((r, i) => {
-    const cls = 'trow' + (r.me ? ' me' : '') + (i < d.playoffCut ? ' playoff' : '');
+    // Single divider below the last qualifying seed, matching the ESPN
+    // board. Highlighting every qualifying row was the 8-team mockup's
+    // treatment; one soft line reads the same on both boards.
+    const cls = 'trow' + (r.me ? ' me' : '')
+              + (i === d.playoffCut - 1 ? ' cut' : '');
     const c = (r.s || '')[0] === 'W' ? 'var(--green)'
             : (r.s || '')[0] === 'L' ? 'var(--red)' : 'var(--cream-50)';
     const faab = (r.faab == null) ? ''
@@ -217,37 +222,28 @@ function renderStandings(d){
     + '<div class="tbl">' + rows + '</div>';
 }
 
-function renderStrip(d, live){
-  if (live){
-    return (d.matchups || []).map(m => {
-      const aLead = num(m.pa) >= num(m.pb);
-      const side = (t, pts, right, lead) =>
-        '<div class="t' + (right ? ' r' : '') + (lead ? ' lead' : '') + '">'
-        + avatar(t.n, t.logo, 'sm')
-        + '<span class="s">' + num(pts).toFixed(1) + '</span>'
-        + '<span class="n">' + esc(t.n) + '</span></div>';
-      return '<div class="m">' + side(m.a, m.pa, false, aLead)
-        + '<div class="sep">VS</div>' + side(m.b, m.pb, true, !aLead) + '</div>';
-    }).join('');
-  }
-  return ((d.upcoming && d.upcoming.games) || []).map(g => {
-    const side = (t, right) => '<div class="t' + (right ? ' r' : '') + (t.me ? ' lead' : '') + '">'
+function renderStrip(d){
+  // Current week's other games, with scores, in both modes. Records are
+  // omitted: the standings already carry them. Your own matchup is not here
+  // because the collector excludes it - it is the hero.
+  return (d.matchups || []).map(m => {
+    const aLead = num(m.pa) >= num(m.pb);
+    const side = (t, pts, right, lead) =>
+      '<div class="t' + (right ? ' r' : '') + (lead ? ' lead' : '') + '">'
       + avatar(t.n, t.logo, 'sm')
-      + '<span class="n">' + esc(t.n) + '</span>'
-      + '<span class="rec">' + esc(t.rec) + '</span></div>';
-    return '<div class="m">' + side(g.a, false)
-      + '<div class="sep">VS</div>' + side(g.b, true) + '</div>';
+      + '<span class="s">' + num(pts).toFixed(1) + '</span>'
+      + '<span class="n">' + esc(t.n) + '</span></div>';
+    return '<div class="m">' + side(m.a, m.pa, false, aLead)
+      + '<div class="sep">VS</div>' + side(m.b, m.pb, true, !aLead) + '</div>';
   }).join('');
 }
 
 /* Mount the moves list. When it overflows its fixed height the track is
    duplicated and scrolled at a constant slow rate; when it fits, nothing
-   animates. Called only when the data signature changed, so the scroll is
-   not restarted on every tick. */
+   animates. Carries its own signature because the payload's `updated` field
+   changes on every collector run, and remounting would restart the scroll
+   mid-cycle. */
 function mountMoves(list){
-  // The payload's `updated` field changes on every collector run, so the main
-  // signature changes even when the moves did not. Remounting would restart
-  // the scroll mid-cycle, so this block keeps its own signature.
   const sig = JSON.stringify(list || []);
   if (sig === lastMovesSig) return;
   lastMovesSig = sig;
@@ -299,8 +295,7 @@ function render(){
   document.getElementById('heroLabel').textContent =
     live ? 'YOUR MATCHUP' : 'WEEK ' + num(d.week) + ' RESULT';
   document.getElementById('mLabel').textContent =
-    live ? 'AROUND THE LEAGUE'
-         : 'WEEK ' + num(d.upcoming && d.upcoming.week) + ' MATCHUPS';
+    live ? 'AROUND THE LEAGUE' : 'WEEK ' + num(d.week) + ' MATCHUPS';
 
   document.getElementById('sideA').innerHTML = heroSide(d.hero.a, false);
   document.getElementById('sideB').innerHTML = heroSide(d.hero.b, true);
@@ -315,7 +310,7 @@ function render(){
 
   document.getElementById('swapZone').innerHTML =
     live ? renderLineup(d) : renderStandings(d);
-  document.getElementById('mlist').innerHTML = renderStrip(d, live);
+  document.getElementById('mlist').innerHTML = renderStrip(d);
 
   document.getElementById('movesBlk').style.display = live ? 'none' : 'flex';
   mountMoves(d.moves);
