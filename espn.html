@@ -8,7 +8,7 @@
 </head>
 <body>
 <!-- --cols: #, avatar, team, record, points-for, streak, FAAB remaining -->
-<div id="stage" style="--cols:52px 54px 1fr 110px 116px 92px 96px;--row-min:44px">
+<div id="stage" style="--cols:52px 54px 1fr 110px 116px 92px 96px;--row-min:50px;--moves-h:176px">
 
   <div class="hdr">
     <div>
@@ -67,7 +67,8 @@ const MODE_OVERRIDE   = null;     // 'live' | 'idle' forces a state
 const TICK_MS         = 60000;    // master tick: re-evaluates mode and redraws
 const REFRESH_MS      = 900000;   // data poll, idle
 const REFRESH_LIVE_MS = 90000;    // data poll, live
-const MOVES_SHOWN     = 4;        // 12 standings rows leave less room than Sleeper's 8
+
+const MOVES_PX_PER_SEC = 18;   // scroll speed of the moves list
 
 const DATA_URL  = 'data/latest/espn.json';
 const LEAGUE_ID = '1529795';
@@ -83,6 +84,7 @@ let data = null;        // last good payload; never cleared on a failed fetch
 let fetchFailed = false;
 let lastFetch = 0;
 let lastSig = '';       // signature check, so the DOM is not rebuilt needlessly
+let lastMovesSig = '';  // separate, so an unrelated data change does not restart the scroll
 
 /* ============================================================
    HELPERS
@@ -253,6 +255,37 @@ function renderStrip(d, live){
   }).join('');
 }
 
+/* Mount the moves list. When it overflows its fixed height the track is
+   duplicated and scrolled at a constant slow rate; when it fits, nothing
+   animates. Called only when the data signature changed, so the scroll is
+   not restarted on every tick. */
+function mountMoves(list){
+  // The payload's `updated` field changes on every collector run, so the main
+  // signature changes even when the moves did not. Remounting would restart
+  // the scroll mid-cycle, so this block keeps its own signature.
+  const sig = JSON.stringify(list || []);
+  if (sig === lastMovesSig) return;
+  lastMovesSig = sig;
+
+  const box = document.getElementById('moves');
+  const item = m => '<div class="mv ' + esc(m.k) + '">'
+    + '<div class="kind">' + esc(m.k).toUpperCase() + '</div>'
+    + '<div class="txt">' + m.txt + '</div>'
+    + '<div class="when">' + esc(m.when) + '</div></div>';
+  const rows = (list || []).map(item).join('');
+  box.innerHTML = '<div class="mvtrack" id="mvtrack">' + rows + '</div>';
+
+  const track = document.getElementById('mvtrack');
+  const need = track.scrollHeight, have = box.clientHeight;
+  if (need <= have) return;                       // fits, stays still
+
+  track.innerHTML = rows + rows;                  // second copy for the loop
+  const shift = need + 8;                         // one copy plus the row gap
+  track.style.setProperty('--mv-shift', '-' + shift + 'px');
+  track.style.setProperty('--mv-dur', (shift / MOVES_PX_PER_SEC).toFixed(1) + 's');
+  track.classList.add('rolling');
+}
+
 function render(){
   const live = currentMode() === 'live';
   const stale = !!(data && data.stale) || fetchFailed;
@@ -300,10 +333,7 @@ function render(){
   document.getElementById('mlist').innerHTML = renderStrip(d, live);
 
   document.getElementById('movesBlk').style.display = live ? 'none' : 'flex';
-  document.getElementById('moves').innerHTML = (d.moves || []).slice(0, MOVES_SHOWN).map(m =>
-    '<div class="mv ' + esc(m.k) + '"><div class="kind">' + esc(m.k).toUpperCase() + '</div>'
-    + '<div class="txt">' + m.txt + '</div>'
-    + '<div class="when">' + esc(m.when) + '</div></div>').join('');
+  mountMoves(d.moves);
 
   // Timestamp comes from the payload, not the clock, so a board whose
   // collector has stopped visibly shows old data rather than a fresh time.
