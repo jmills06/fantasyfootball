@@ -313,18 +313,10 @@ def discover_espn(args):
             fetch(f"espn__mBoxscore_sp{sp - 1}",
                   url_for("mBoxscore", scoringPeriodId=sp - 1), cookies=cookies)
 
-    # Transactions. mTransactions2 needs an x-fantasy-filter header. The
-    # filter is request metadata we author ourselves, not a credential, so
-    # it is recorded here in the source for reproducibility - but the header
-    # dict itself is still never logged at runtime.
-    tx_filter = json.dumps({
-        "transactions": {
-            "filterType": {"value": ["WAIVER", "FREEAGENT", "TRADE_ACCEPTED",
-                                     "ROSTER", "DRAFT"]},
-        }
-    })
-    fetch("espn__mTransactions2", url_for("mTransactions2"), cookies=cookies,
-          extra_headers={"x-fantasy-filter": tx_filter})
+    # Transactions. Discovery showed mTransactions2 answers WITHOUT an
+    # x-fantasy-filter header, and 400s with the obvious filter shape, so
+    # the unfiltered call is the one that works. The payload is
+    # draft-dominated; filter by transaction type client-side.
     fetch("espn__mTransactions2_nofilter", url_for("mTransactions2"),
           cookies=cookies)
 
