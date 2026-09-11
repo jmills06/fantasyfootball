@@ -334,6 +334,10 @@ def build(cfg, players):
             "s": streak(rid),
             "logo": team_logo(u),
             "me": rid == my_roster,
+            # FAAB remaining. Carried on the row rather than as a separate
+            # block because the board knows team names, not roster ids, and
+            # a column costs no vertical space in the swap zone.
+            "faab": cfg["faab"]["budget"] - s.get("waiver_budget_used", 0),
         }
         if s.get("ties"):
             row["ties"] = s["ties"]
@@ -389,11 +393,7 @@ def build(cfg, players):
         "stale": False,
         "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "playoffCut": cfg["playoffCut"],
-        "faab": {
-            "budget": cfg["faab"]["budget"],
-            "used": {str(r["roster_id"]): (r.get("settings") or {}).get(
-                "waiver_budget_used", 0) for r in rosters},
-        },
+        "faab": {"budget": cfg["faab"]["budget"]},
         "hero": {"a": hero_side(mine, me=True), "b": hero_side(opp)},
         "lineup": lineup,
         "bench": {"a": bench_total(mine), "b": bench_total(opp)},
