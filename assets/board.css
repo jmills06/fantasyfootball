@@ -27,6 +27,12 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
     radial-gradient(680px 420px at 88% 3%, rgba(255,112,48,.10), transparent 70%),
     linear-gradient(180deg,var(--navy-dark) 0%,var(--navy) 42%,var(--navy-light) 100%);
   color:var(--cream);display:flex;flex-direction:column;padding:34px 36px 26px;gap:18px;
+  /* Explicit line-height so box heights come from our padding and row rules
+     rather than from font metrics. Oswald's default line box is ~1.48em; a
+     fallback font's is ~1.17em, so without this the same markup is ~170px
+     taller on the real board than in any test that cannot load the webfont.
+     Elements needing tighter leading override this below. */
+  line-height:1.25;
 }
 
 /* header */
@@ -147,8 +153,6 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
   background:var(--panel);border-left:5px solid transparent}
 .trow.me{background:linear-gradient(90deg,rgba(255,112,48,.20),rgba(255,112,48,.04));
   border-left-color:var(--orange)}
-.trow.playoff{border-left-color:rgba(46,204,113,.55)}
-.trow.me.playoff{border-left-color:var(--orange)}
 .rk{font-family:'Oswald',sans-serif;font-size:26px;color:var(--cream-50)}
 .tn{font-family:'Oswald',sans-serif;font-size:27px;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
@@ -217,12 +221,6 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
    drawing over the headers. Never replace these with fixed row heights. */
 .lu,.tbl{overflow:hidden}
 
-/* Denser matchup strip. 12 teams means 6 upcoming pairings rather than 4, and
-   at full size they crowd the standings out of the swap zone. */
-.mlist.compact .m{padding:7px 18px}
-.mlist.compact .m .t .n{font-size:23px}
-.mlist.compact .m .t .s{font-size:28px}
-.mlist.compact .m .t .rec{font-size:21px}
 
 /* Projected points under the hero score. ESPN only - Sleeper never emits
    proj, so the element is simply not rendered there. */
