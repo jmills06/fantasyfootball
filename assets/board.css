@@ -129,7 +129,14 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 .bench b{font-weight:400;color:var(--cream-50)}
 
 /* compact matchups */
-.mlist{display:flex;flex-direction:column;gap:9px}
+/* The strip is a fixed window that pages through the week's games. 12 teams
+   means 5 other matchups, too many to show at once, and unlike the moves feed
+   these are scores - read at a glance, so a static group that swaps beats a
+   continuously moving line. Height is set from the row count in JS so the
+   pages line up exactly. transform only, per the Pi constraints. */
+.mlist{overflow:hidden;position:relative}
+.mtrack{display:flex;flex-direction:column;gap:9px;will-change:transform}
+.mtrack.paging{animation:mpage var(--m-dur,16s) infinite}
 .m{display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:12px;
   background:var(--panel);border:1px solid var(--line)}
 .m .t{flex:1;display:flex;align-items:center;gap:12px;min-width:0}
