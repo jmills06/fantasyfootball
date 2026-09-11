@@ -1,0 +1,114 @@
+# Collects both leagues into data/latest/ and commits the result.
+#
+# TRIGGERING (handoff section 9): GitHub's built-in `schedule:` is unreliable
+# for this suite, so it is left commented below as a backup only. The real
+# trigger is cron-job.org firing workflow_dispatch:
+#
+#   POST https://api.github.com/repos/jmills06/fantasyfootball/actions/workflows/collect.yml/dispatches
+#   Headers: Authorization: Bearer <fine-grained PAT with Actions: read+write>
+#            Accept: application/vnd.github+json
+#   Body:    {"ref":"main"}
+#
+#   Two schedules, both hitting this same workflow:
+#     slow - every 6h, Mon-Sat
+#     fast - every 60-90s during Sunday game windows
+#
+# The PAT lives in cron-job.org, never in this repo.
+
+name: Collect league data
+
+on:
+  workflow_dispatch:
+    inputs:
+      league:
+        description: Which league to collect
+        type: choice
+        options: [all, sleeper, espn]
+        default: all
+        required: false
+
+  # Backup only - do not rely on this. See the note above.
+  # schedule:
+  #   - cron: '0 */6 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history: the rebase-retry loop below needs real history to
+          # rebase onto. A shallow clone makes that fail.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: python -m pip install --quiet truststore
+
+      # Each collector runs independently and is allowed to fail. Partial data
+      # is still committed below, and the job is failed at the end. Both
+      # collectors preserve the previous file and set "stale" rather than
+      # writing an error state, so a failure never blanks a board.
+      - name: Collect Sleeper
+        id: sleeper
+        if: ${{ inputs.league == 'sleeper' || inputs.league == 'all' || inputs.league == '' }}
+        continue-on-error: true
+        run: python collect_sleeper.py
+
+      - name: Collect ESPN
+        id: espn
+        if: ${{ inputs.league == 'espn' || inputs.league == 'all' || inputs.league == '' }}
+        continue-on-error: true
+        env:
+          # Full ESPN account access. Secrets only - never echo these, never
+          # pass them on a command line, never write them to a file.
+          ESPN_S2: ${{ secrets.ESPN_S2 }}
+          ESPN_SWID: ${{ secrets.ESPN_SWID }}
+        run: python collect_espn.py
+
+      - name: Commit and push
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/latest assets/logos 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no changes to commit"
+            exit 0
+          fi
+          git commit -m "Update league data [skip ci]"
+
+          # Mandatory push-race guard (handoff section 9 / CLAUDE.md section 3).
+          # Two collectors writing data/latest/ in one repo is exactly the case
+          # this exists for. Five attempts, rebasing onto whatever landed first.
+          for i in 1 2 3 4 5; do
+            echo "push attempt $i"
+            if git push origin "HEAD:${BRANCH}"; then
+              echo "pushed"
+              exit 0
+            fi
+            git pull --rebase --autostash -X theirs origin "${BRANCH}" || true
+            sleep $((i * 3))
+          done
+          echo "push failed after 5 attempts"
+          exit 1
+
+      - name: Fail if a collector failed
+        if: ${{ steps.sleeper.outcome == 'failure' || steps.espn.outcome == 'failure' }}
+        run: |
+          echo "sleeper: ${{ steps.sleeper.outcome }}"
+          echo "espn:    ${{ steps.espn.outcome }}"
+          echo "Data that did collect has been committed; the boards show stale"
+          echo "rather than blanking. Check the step log above for the status code."
+          exit 1
