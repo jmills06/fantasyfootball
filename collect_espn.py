@@ -40,6 +40,7 @@ CONFIG = ROOT / "config" / "leagues.json"
 OUT = ROOT / "data" / "latest" / "espn.json"
 UA = "Mozilla/5.0 (compatible; fantasyfootball-collector/1.0)"
 MOVES_CAP = 8
+MOVES_MAX_AGE_DAYS = 7   # only the last week of activity is interesting
 
 # Discovery: proTeamId is a numeric id, not an abbreviation, so the contract's
 # "t" field needs this map. 32 stable entries.
@@ -466,8 +467,11 @@ def build(cfg, cookie):
         """
         return pnames.get(pid) or None
 
+    cutoff_ms = (time.time() - MOVES_MAX_AGE_DAYS * 86400) * 1000
     for t in sorted(tx, key=lambda x: x.get("proposedDate") or 0, reverse=True):
         if t.get("type") in SKIP_TX or t.get("isPending"):
+            continue
+        if (t.get("proposedDate") or 0) < cutoff_ms:
             continue
         if t.get("status") not in ("EXECUTED", None):
             continue

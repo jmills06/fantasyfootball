@@ -198,6 +198,8 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
   text-overflow:ellipsis}
 .mv .txt b{color:var(--cream);font-weight:600}
 .mv .when{font-size:19px;color:var(--cream-30)}
+.mv.none{border-left-color:rgba(255,255,255,.12)}
+.mv.none .txt{color:var(--cream-30)}
 
 
 .ftr{display:flex;justify-content:space-between;align-items:center;font-size:18px;
