@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Laces Out — Sleeper Board</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Source+Sans+Pro:wght@300;400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/board.css">
+</head>
+<body>
+<!-- --cols: #, avatar, team, record, points-for, streak, FAAB remaining -->
+<div id="stage" style="--cols:52px 54px 1fr 110px 116px 92px 96px">
+
+  <div class="hdr">
+    <div>
+      <div class="platform">SLEEPER</div>
+      <h1 id="leagueName">&nbsp;</h1>
+    </div>
+    <div class="rt">
+      <div class="live" id="liveFlag"><div class="dot"></div><span>LIVE</span></div>
+      <div class="wk" id="weekPill">&nbsp;</div>
+    </div>
+  </div>
+  <div class="rule"></div>
+
+  <div id="body" style="display:none;flex-direction:column;flex:1 1 auto;min-height:0;gap:18px">
+    <div class="blk">
+      <div class="sec"><span id="heroLabel"></span><i></i></div>
+      <div class="hero">
+        <div class="top">
+          <div class="side" id="sideA"></div>
+          <div class="mid"><div class="v">VS</div><div class="delta" id="delta"></div></div>
+          <div class="side right" id="sideB"></div>
+        </div>
+        <div class="bar"><div class="a" id="barA"></div><div class="b"></div></div>
+      </div>
+    </div>
+
+    <div class="blk grow" id="swapZone"></div>
+
+    <div class="blk">
+      <div class="sec"><span id="mLabel"></span><i></i></div>
+      <div class="mlist" id="mlist"></div>
+    </div>
+
+    <div class="blk" id="movesBlk">
+      <div class="sec"><span>LATEST MOVES</span><i></i></div>
+      <div class="moves" id="moves"></div>
+    </div>
+  </div>
+
+  <div class="wait" id="wait">LOADING</div>
+
+  <div class="ftr">
+    <div id="lid"></div>
+    <div class="stale" id="staleFlag"><div class="dot"></div><span>STALE</span></div>
+    <div id="stamp"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   TUNING CONSTANTS
+   ============================================================ */
+const AUTO_FIT        = false;    // true only for browser preview; ?fit=1 also works
+const LIVE_DAYS       = [0];      // 0=Sun. Add 4 for Thu night, 1 for Mon night.
+const MODE_OVERRIDE   = null;     // 'live' | 'idle' forces a state
+const TICK_MS         = 60000;    // master tick: re-evaluates mode and redraws
+const REFRESH_MS      = 900000;   // data poll, idle
+const REFRESH_LIVE_MS = 90000;    // data poll, live
+
+const DATA_URL  = 'data/latest/sleeper.json';
+const LEAGUE_ID = '1389343119928991744';
+
+/* Preview helpers. ?mode=live|idle and ?fit=1 let the board be reviewed in a
+   browser without editing the constants above. */
+const QS = new URLSearchParams(location.search);
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let data = null;        // last good payload; never cleared on a failed fetch
+let fetchFailed = false;
+let lastFetch = 0;
+let lastSig = '';       // signature check, so the DOM is not rebuilt needlessly
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const num = v => (typeof v === 'number' && isFinite(v)) ? v : 0;
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function initials(name){
+  return String(name || '').split(/\s+/).filter(Boolean).slice(0,2)
+    .map(w => w[0]).join('').toUpperCase() || '?';
+}
+
+/* Collector emits an absolute logo URL or null. A dead or auth-walled image
+   falls back to initials rather than leaving a hole. */
+function avatar(name, logo, size, me){
+  const cls = 'av ' + size + (me ? ' me' : '');
+  if (logo && /^https?:/.test(logo)){
+    return '<div class="' + cls + '"><img src="' + esc(logo) + '" alt="" '
+         + 'onerror="this.parentNode.textContent=\'' + initials(name) + '\'"></div>';
+  }
+  return '<div class="' + cls + '">' + initials(name) + '</div>';
+}
+
+function currentMode(){
+  const q = QS.get('mode');
+  if (q === 'live' || q === 'idle') return q;
+  if (MODE_OVERRIDE) return MODE_OVERRIDE;
+  return LIVE_DAYS.includes(new Date().getDay()) ? 'live' : 'idle';
+}
+
+function fit(){
+  if (!AUTO_FIT && QS.get('fit') !== '1') return;
+  const s = Math.min(innerWidth / 1080, innerHeight / 1920);
+  document.getElementById('stage').style.transform = 'scale(' + s + ')';
+  document.body.style.width  = (1080 * s) + 'px';
+  document.body.style.height = (1920 * s) + 'px';
+  document.body.style.margin = '0 auto';
+}
+
+function clockOf(iso){
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d)) return '';
+  return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).toUpperCase();
+}
+
+/* ============================================================
+   DATA
+   ============================================================ */
+async function load(){
+  lastFetch = Date.now();
+  try {
+    const r = await fetch(DATA_URL + '?t=' + lastFetch, {cache:'no-store'});
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    if (!j || !Array.isArray(j.lineup)) throw new Error('shape');
+    data = j;
+    fetchFailed = false;
+  } catch (e) {
+    // Preserve whatever is on screen. A blank board is the failure mode to
+    // avoid; an old board with a quiet stale marker is not.
+    fetchFailed = true;
+  }
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function heroSide(t, right){
+  return avatar(t.name, t.logo, 'lg', t.me)
+    + '<div class="txt">'
+    + '<div class="tag"' + (right ? ' style="color:var(--cream-30)"' : '') + '>'
+    + (right ? 'OPPONENT' : 'YOU') + '</div>'
+    + '<div class="nm">' + esc(t.name) + '</div>'
+    + '<div class="rec">' + esc(t.rec) + '</div>'
+    + '<div class="pts">' + num(t.pts).toFixed(1) + '</div></div>';
+}
+
+function renderLineup(d){
+  const rows = d.lineup.map(r => {
+    const ap = num(r.a && r.a.p), bp = num(r.b && r.b.p);
+    const cell = (p, side, win) => {
+      const r2 = side === 'b' ? ' r' : '';
+      if (!p || p.empty){
+        return '<div class="cell empty' + r2 + '">'
+             + '<div class="p">' + num(p && p.p).toFixed(1) + '</div>'
+             + '<div class="n">Empty</div></div>';
+      }
+      return '<div class="cell' + r2 + (win ? ' win' : '') + '">'
+           + '<div class="p">' + num(p.p).toFixed(1) + '</div>'
+           + '<div class="n">' + esc(p.n) + '<em>' + esc(p.t) + '</em></div></div>';
+    };
+    return '<div class="slot">' + cell(r.a, 'a', ap > bp)
+      + '<div class="pos' + (r.pos === 'FLEX' ? ' flex' : '') + '">' + esc(r.pos) + '</div>'
+      + cell(r.b, 'b', bp > ap) + '</div>';
+  }).join('');
+
+  return '<div class="sec"><span>HEAD TO HEAD</span><i></i></div>'
+    + '<div class="luhead">'
+    + '<div class="h"><span>' + esc(d.hero.a.name) + '</span></div><div></div>'
+    + '<div class="h r"><span>' + esc(d.hero.b.name) + '</span></div></div>'
+    + '<div class="lu">' + rows + '</div>'
+    + '<div class="bench"><b>' + num(d.bench && d.bench.a).toFixed(1) + '</b>'
+    + '<div>BENCH POINTS</div><b>' + num(d.bench && d.bench.b).toFixed(1) + '</b></div>';
+}
+
+function renderStandings(d){
+  const budget = (d.faab && d.faab.budget) || 0;
+  const rows = (d.standings || []).map((r, i) => {
+    const cls = 'trow' + (r.me ? ' me' : '') + (i < d.playoffCut ? ' playoff' : '');
+    const c = (r.s || '')[0] === 'W' ? 'var(--green)'
+            : (r.s || '')[0] === 'L' ? 'var(--red)' : 'var(--cream-50)';
+    const faab = (r.faab == null) ? ''
+      : '<div class="fb' + (budget && r.faab <= budget * 0.25 ? ' low' : '') + '">$'
+        + r.faab + '</div>';
+    return '<div class="' + cls + '"><div class="rk">' + (i + 1) + '</div>'
+      + '<div>' + avatar(r.t, r.logo, 'sm') + '</div>'
+      + '<div class="tn">' + esc(r.t) + '</div>'
+      + '<div class="rc">' + num(r.w) + '-' + num(r.l) + '</div>'
+      + '<div class="pf">' + num(r.pf).toFixed(1) + '</div>'
+      + '<div class="stk" style="color:' + c + '">' + esc(r.s) + '</div>'
+      + faab + '</div>';
+  }).join('');
+
+  return '<div class="sec"><span>STANDINGS</span><i></i></div>'
+    + '<div class="thead"><div>#</div><div></div><div>TEAM</div><div>REC</div>'
+    + '<div style="text-align:right">PTS FOR</div>'
+    + '<div style="text-align:right">STRK</div>'
+    + '<div style="text-align:right">FAAB</div></div>'
+    + '<div class="tbl">' + rows + '</div>';
+}
+
+function renderStrip(d, live){
+  if (live){
+    return (d.matchups || []).map(m => {
+      const aLead = num(m.pa) >= num(m.pb);
+      const side = (t, pts, right, lead) =>
+        '<div class="t' + (right ? ' r' : '') + (lead ? ' lead' : '') + '">'
+        + avatar(t.n, t.logo, 'sm')
+        + '<span class="s">' + num(pts).toFixed(1) + '</span>'
+        + '<span class="n">' + esc(t.n) + '</span></div>';
+      return '<div class="m">' + side(m.a, m.pa, false, aLead)
+        + '<div class="sep">VS</div>' + side(m.b, m.pb, true, !aLead) + '</div>';
+    }).join('');
+  }
+  return ((d.upcoming && d.upcoming.games) || []).map(g => {
+    const side = (t, right) => '<div class="t' + (right ? ' r' : '') + (t.me ? ' lead' : '') + '">'
+      + avatar(t.n, t.logo, 'sm')
+      + '<span class="n">' + esc(t.n) + '</span>'
+      + '<span class="rec">' + esc(t.rec) + '</span></div>';
+    return '<div class="m">' + side(g.a, false)
+      + '<div class="sep">VS</div>' + side(g.b, true) + '</div>';
+  }).join('');
+}
+
+function render(){
+  const live = currentMode() === 'live';
+  const stale = !!(data && data.stale) || fetchFailed;
+
+  document.getElementById('staleFlag').className = 'stale' + (stale ? ' on' : '');
+
+  if (!data){
+    document.getElementById('wait').textContent = fetchFailed ? 'NO DATA' : 'LOADING';
+    return;
+  }
+
+  // Signature check: skip the rebuild entirely when nothing changed, to avoid
+  // reflow and animation restarts on the Pi.
+  const sig = live + '|' + stale + '|' + JSON.stringify(data);
+  if (sig === lastSig) return;
+  lastSig = sig;
+
+  const d = data;
+  document.getElementById('wait').style.display = 'none';
+  document.getElementById('body').style.display = 'flex';
+
+  document.getElementById('leagueName').textContent = d.league || '';
+  document.getElementById('weekPill').textContent = 'WEEK ' + num(d.week);
+  document.getElementById('lid').textContent = 'LEAGUE ' + LEAGUE_ID;
+  document.getElementById('liveFlag').style.display = live ? 'flex' : 'none';
+  document.getElementById('heroLabel').textContent =
+    live ? 'YOUR MATCHUP' : 'WEEK ' + num(d.week) + ' RESULT';
+  document.getElementById('mLabel').textContent =
+    live ? 'AROUND THE LEAGUE'
+         : 'WEEK ' + num(d.upcoming && d.upcoming.week) + ' MATCHUPS';
+
+  document.getElementById('sideA').innerHTML = heroSide(d.hero.a, false);
+  document.getElementById('sideB').innerHTML = heroSide(d.hero.b, true);
+
+  const pa = num(d.hero.a.pts), pb = num(d.hero.b.pts), diff = pa - pb;
+  const dEl = document.getElementById('delta');
+  dEl.textContent = (diff >= 0 ? '+' : '') + diff.toFixed(1);
+  dEl.className = 'delta ' + (diff >= 0 ? 'up' : 'down');
+  // Before kickoff both sides are 0.0; split the bar rather than dividing by zero.
+  document.getElementById('barA').style.width =
+    ((pa + pb) > 0 ? (pa / (pa + pb) * 100) : 50).toFixed(1) + '%';
+
+  document.getElementById('swapZone').innerHTML =
+    live ? renderLineup(d) : renderStandings(d);
+  document.getElementById('mlist').innerHTML = renderStrip(d, live);
+
+  document.getElementById('movesBlk').style.display = live ? 'none' : 'flex';
+  document.getElementById('moves').innerHTML = (d.moves || []).map(m =>
+    '<div class="mv ' + esc(m.k) + '"><div class="kind">' + esc(m.k).toUpperCase() + '</div>'
+    + '<div class="txt">' + m.txt + '</div>'
+    + '<div class="when">' + esc(m.when) + '</div></div>').join('');
+
+  // Timestamp comes from the payload, not the clock, so a board whose
+  // collector has stopped visibly shows old data rather than a fresh time.
+  document.getElementById('stamp').textContent = 'UPDATED ' + clockOf(d.updated);
+}
+
+/* ============================================================
+   MASTER TICK - one timer drives mode flips, polling and redraw
+   ============================================================ */
+async function tick(){
+  const interval = currentMode() === 'live' ? REFRESH_LIVE_MS : REFRESH_MS;
+  if (!data || (Date.now() - lastFetch) >= interval) await load();
+  render();
+}
+
+addEventListener('resize', fit);
+fit();
+tick();
+setInterval(tick, TICK_MS);
+</script>
+</body>
+</html>
