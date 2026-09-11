@@ -69,6 +69,9 @@ const REFRESH_MS      = 900000;   // data poll, idle
 const REFRESH_LIVE_MS = 90000;    // data poll, live
 
 const MOVES_PX_PER_SEC = 18;   // scroll speed of the moves list
+const STRIP_ROWS       = 3;    // matchups visible at once before paging
+const STRIP_GAP        = 9;    // must match the .mtrack gap in board.css
+const STRIP_PAGE_SEC   = 9;    // seconds each page is held
 
 const DATA_URL  = 'data/latest/sleeper.json';
 const LEAGUE_ID = '1389343119928991744';
@@ -85,6 +88,7 @@ let fetchFailed = false;
 let lastFetch = 0;
 let lastSig = '';       // signature check, so the DOM is not rebuilt needlessly
 let lastMovesSig = '';  // separate, so an unrelated data change does not restart the scroll
+let lastStripSig = '';  // same, for the matchup strip's page cycle
 
 /* ============================================================
    HELPERS
@@ -222,20 +226,64 @@ function renderStandings(d){
     + '<div class="tbl">' + rows + '</div>';
 }
 
-function renderStrip(d){
-  // Current week's other games, with scores, in both modes. Records are
-  // omitted: the standings already carry them. Your own matchup is not here
-  // because the collector excludes it - it is the hero.
-  return (d.matchups || []).map(m => {
+/* Inject or replace a keyframes rule. Used for the strip, whose page offsets
+   depend on measured row height and so cannot be written statically. */
+function injectKeyframes(name, body){
+  let el = document.getElementById('kf-' + name);
+  if (!el){ el = document.createElement('style'); el.id = 'kf-' + name;
+            document.head.appendChild(el); }
+  el.textContent = '@keyframes ' + name + '{' + body + '}';
+}
+
+/* Mount the matchup strip. Shows STRIP_ROWS games at a time and pages through
+   the rest, holding each page long enough to read before sliding. Unlike the
+   moves feed these are scores, so they sit still while being read rather than
+   scrolling continuously. Carries its own signature so a poll that changes
+   only the timestamp does not restart the cycle mid-page. */
+function mountStrip(list){
+  const games = list || [];
+  const sig = JSON.stringify(games);
+  if (sig === lastStripSig) return;
+  lastStripSig = sig;
+
+  const box = document.getElementById('mlist');
+  const side = (t, pts, right, lead) =>
+    '<div class="t' + (right ? ' r' : '') + (lead ? ' lead' : '') + '">'
+    + avatar(t.n, t.logo, 'sm')
+    + '<span class="s">' + num(pts).toFixed(1) + '</span>'
+    + '<span class="n">' + esc(t.n) + '</span></div>';
+  const rows = games.map(m => {
     const aLead = num(m.pa) >= num(m.pb);
-    const side = (t, pts, right, lead) =>
-      '<div class="t' + (right ? ' r' : '') + (lead ? ' lead' : '') + '">'
-      + avatar(t.n, t.logo, 'sm')
-      + '<span class="s">' + num(pts).toFixed(1) + '</span>'
-      + '<span class="n">' + esc(t.n) + '</span></div>';
     return '<div class="m">' + side(m.a, m.pa, false, aLead)
       + '<div class="sep">VS</div>' + side(m.b, m.pb, true, !aLead) + '</div>';
   }).join('');
+
+  box.innerHTML = '<div class="mtrack" id="mtrack">' + rows + '</div>';
+  const n = games.length;
+  if (!n){ box.style.height = ''; return; }
+
+  const track = document.getElementById('mtrack');
+  const rowH = track.children[0].getBoundingClientRect().height;
+  const shown = Math.min(n, STRIP_ROWS);
+  // Fixed window, so the swap zone above gets a deterministic remainder.
+  box.style.height = (shown * rowH + (shown - 1) * STRIP_GAP) + 'px';
+  if (n <= STRIP_ROWS) return;               // everything fits, nothing moves
+
+  // Page offsets are clamped so the last page is full rather than part empty;
+  // one game repeats across the boundary, which reads better than a gap.
+  const pages = Math.ceil(n / STRIP_ROWS);
+  const step = rowH + STRIP_GAP;
+  const slot = 100 / pages;
+  let kf = '';
+  for (let i = 0; i < pages; i++){
+    const y = (-Math.min(i * STRIP_ROWS, n - STRIP_ROWS) * step).toFixed(1) + 'px';
+    kf += (i * slot).toFixed(2) + '%{transform:translateY(' + y + ')}';
+    kf += (i * slot + slot * 0.88).toFixed(2) + '%{transform:translateY(' + y + ')}';
+  }
+  kf += '100%{transform:translateY(0)}';
+  injectKeyframes('mpage', kf);
+  track.style.setProperty('--m-dur', (pages * STRIP_PAGE_SEC) + 's');
+  track.classList.add('paging');
 }
 
 /* Mount the moves list. When it overflows its fixed height the track is
@@ -310,7 +358,7 @@ function render(){
 
   document.getElementById('swapZone').innerHTML =
     live ? renderLineup(d) : renderStandings(d);
-  document.getElementById('mlist').innerHTML = renderStrip(d);
+  mountStrip(d.matchups);
 
   document.getElementById('movesBlk').style.display = live ? 'none' : 'flex';
   mountMoves(d.moves);

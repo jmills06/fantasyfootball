@@ -366,8 +366,10 @@ def build(cfg, cookie):
               for i, slot in enumerate(slot_order)]
 
     # --- other games ------------------------------------------------------
-    # 12 teams means 5 other games, which crowds the strip. Show the two
-    # closest plus the week's highest-scoring game instead (handoff s8).
+    # All other games, closest first. The handoff suggested cutting this to
+    # the two closest plus the high score, because 5 games crowded the strip -
+    # but the board now pages through them, so nothing has to be dropped.
+    # Closest first means the most interesting games land on the first page.
     others = []
     for g in schedule:
         if g.get("matchupPeriodId") != anchor or g is my_game:
@@ -377,13 +379,9 @@ def build(cfg, cookie):
         others.append({"a": side_of(h.get("teamId")), "pa": ph,
                        "b": side_of(a.get("teamId")), "pb": pa,
                        "_gap": abs(ph - pa), "_top": max(ph, pa)})
-    order = sorted(range(len(others)), key=lambda i: others[i]["_gap"])
-    picked = order[:2]
-    rest = [i for i in order[2:]]
-    if rest:
-        picked.append(max(rest, key=lambda i: others[i]["_top"]))
-    matchups = [{k: v for k, v in others[i].items() if not k.startswith("_")}
-                for i in picked]
+    others.sort(key=lambda m: m["_gap"])
+    matchups = [{k: v for k, v in m.items() if not k.startswith("_")}
+                for m in others]
 
     # --- next week --------------------------------------------------------
     upcoming_week = anchor + 1
