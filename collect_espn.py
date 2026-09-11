@@ -422,13 +422,18 @@ def build(cfg, cookie):
             row["playoffPct"] = round(pct, 4)
             has_odds = True
         standings.append(row)
-    # ESPN publishes playoffSeed, which already encodes the league's tiebreak
-    # (total points scored). Use it when populated; before any games are
-    # played every seed is 0, so fall back to wins then points-for.
-    seeds = {t["id"]: (t.get("playoffSeed") or 0) for t in teams}
-    if any(v > 0 for v in seeds.values()):
-        rank = {name_of(tid): (v if v > 0 else 99) for tid, v in seeds.items()}
-        standings.sort(key=lambda r: (rank.get(r["t"], 99), -r["w"], -r["pf"]))
+    # ESPN publishes playoffSeed, which encodes the league's tiebreak (total
+    # points scored) - but only once results exist. Before any game has been
+    # decided every team is 0-0 and the seeds are effectively arbitrary, which
+    # renders as a table in no discernible order. So the seed is trusted only
+    # once someone has a win or a loss; until then, sort by whatever ordering
+    # signal is actually meaningful.
+    played = any(r["w"] or r["l"] for r in standings)
+    seeds = {name_of(t["id"]): (t.get("playoffSeed") or 0) for t in teams}
+    if played and any(v > 0 for v in seeds.values()):
+        standings.sort(key=lambda r: (seeds.get(r["t"]) or 99, -r["w"], -r["pf"]))
+    elif has_odds:
+        standings.sort(key=lambda r: (-(r.get("playoffPct") or 0), -r["pf"]))
     else:
         standings.sort(key=lambda r: (-r["w"], -r["pf"]))
     print(f"  playoff odds present: {has_odds}")
@@ -455,7 +460,13 @@ def build(cfg, cookie):
                     pnames[p["id"]] = p.get("fullName") or ""
 
     def pname(pid):
-        return pnames.get(pid) or f"player {pid}"
+        """None when the id cannot be resolved.
+
+        The name map is built from current rosters, so a dropped player is
+        often no longer resolvable. Callers omit the clause rather than
+        printing a raw id at the reader.
+        """
+        return pnames.get(pid) or None
 
     for t in sorted(tx, key=lambda x: x.get("proposedDate") or 0, reverse=True):
         if t.get("type") in SKIP_TX or t.get("isPending"):
@@ -479,18 +490,25 @@ def build(cfg, cookie):
                           "when": when})
         elif adds:
             i = adds[0]
+            added = pname(i.get("playerId"))
+            if not added:
+                continue  # the added player is the subject; no name, no move
             verb = "claimed" if t.get("type") == "WAIVER" else "added"
-            txt = f"<b>{name_of(i.get('toTeamId'))}</b> {verb} {pname(i.get('playerId'))}"
+            txt = f"<b>{name_of(i.get('toTeamId'))}</b> {verb} {added}"
             if num(t.get("bidAmount")) > 0:
                 txt += f" (${int(num(t['bidAmount']))})"
-            if drops:
-                txt += f", dropped {pname(drops[0].get('playerId'))}"
+            dropped = pname(drops[0].get("playerId")) if drops else None
+            if dropped:
+                txt += f", dropped {dropped}"
             moves.append({"k": "add", "txt": txt, "when": when})
         elif drops:
             i = drops[0]
+            dropped = pname(i.get("playerId"))
+            if not dropped:
+                continue
             moves.append({"k": "drop",
                           "txt": f"<b>{name_of(i.get('fromTeamId'))}</b> dropped "
-                                 f"{pname(i.get('playerId'))}",
+                                 f"{dropped}",
                           "when": when})
         if len(moves) >= MOVES_CAP:
             break
