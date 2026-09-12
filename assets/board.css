@@ -13,7 +13,12 @@
 
 :root{
   --navy:#152333; --navy-dark:#0d1620; --navy-light:#1e3347;
-  --orange:#ff7030; --cream:#fdf8e5;
+  /* Accent is per-board: each board sets --accent and --accent-rgb on #stage
+     so the two leagues are told apart at a glance. Defaults are the original
+     Everyday Ham orange, so an unstyled board is unchanged. --accent-rgb is
+     the same colour as bare channels, for the rgba() tints below. */
+  --accent:#ff7030; --accent-rgb:255,112,48;
+  --cream:#fdf8e5;
   --cream-80:rgba(253,248,229,.8); --cream-50:rgba(253,248,229,.5);
   --cream-30:rgba(253,248,229,.3);
   --line:rgba(255,255,255,.10); --panel:rgba(255,255,255,.05);
@@ -24,7 +29,7 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 #stage{
   position:absolute;top:0;left:0;width:1080px;height:1920px;transform-origin:top left;
   background:
-    radial-gradient(680px 420px at 88% 3%, rgba(255,112,48,.10), transparent 70%),
+    radial-gradient(680px 420px at 88% 3%, rgba(var(--accent-rgb),.10), transparent 70%),
     linear-gradient(180deg,var(--navy-dark) 0%,var(--navy) 42%,var(--navy-light) 100%);
   color:var(--cream);display:flex;flex-direction:column;padding:34px 36px 26px;gap:18px;
   /* Explicit line-height so box heights come from our padding and row rules
@@ -38,22 +43,22 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 /* header */
 .hdr{display:flex;align-items:flex-end;justify-content:space-between;flex:0 0 auto}
 .platform{font-family:'Oswald',sans-serif;font-size:17px;font-weight:500;
-  letter-spacing:.24em;color:var(--orange)}
+  letter-spacing:.24em;color:var(--accent)}
 .hdr h1{font-family:'Oswald',sans-serif;font-weight:600;font-size:50px;line-height:1}
 .hdr .rt{display:flex;align-items:center;gap:16px}
 .wk{font-family:'Oswald',sans-serif;font-weight:500;font-size:29px;letter-spacing:.10em;
-  padding:9px 20px 7px;border-radius:8px;background:var(--orange);color:var(--navy-dark)}
+  padding:9px 20px 7px;border-radius:8px;background:var(--accent);color:var(--navy-dark)}
 .live{display:flex;align-items:center;gap:9px;font-family:'Oswald',sans-serif;
   font-size:21px;letter-spacing:.16em;color:var(--green)}
 .live .dot{width:12px;height:12px;border-radius:50%;background:var(--green);
   animation:blink 2s ease-in-out infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
-.rule{height:2px;background:linear-gradient(90deg,var(--orange),rgba(255,112,48,0));flex:0 0 auto}
+.rule{height:2px;background:linear-gradient(90deg,var(--accent),rgba(var(--accent-rgb),0));flex:0 0 auto}
 
 .sec{display:flex;align-items:center;gap:14px;margin-bottom:11px}
 .sec span{font-family:'Oswald',sans-serif;font-size:19px;font-weight:500;
-  letter-spacing:.22em;color:var(--orange);white-space:nowrap}
-.sec i{flex:1;height:1px;background:linear-gradient(90deg,rgba(255,112,48,.5),rgba(255,112,48,0))}
+  letter-spacing:.22em;color:var(--accent);white-space:nowrap}
+.sec i{flex:1;height:1px;background:linear-gradient(90deg,rgba(var(--accent-rgb),.5),rgba(var(--accent-rgb),0))}
 .blk{display:flex;flex-direction:column;flex:0 0 auto}
 .blk.grow{flex:1 1 auto;min-height:0}
 
@@ -64,16 +69,16 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
   color:var(--cream-50);letter-spacing:.04em}
 .av img{width:100%;height:100%;object-fit:cover;display:block}
 .av.lg{width:112px;height:112px;font-size:38px}
-.av.lg.me{border-color:var(--orange)}
+.av.lg.me{border-color:var(--accent)}
 .av.sm{width:34px;height:34px;font-size:14px}
 
 /* hero */
-.hero{border-radius:16px;padding:24px 28px 20px;border:2px solid var(--orange);
-  background:linear-gradient(160deg,rgba(255,112,48,.14),rgba(255,112,48,.03) 60%,transparent)}
+.hero{border-radius:16px;padding:24px 28px 20px;border:2px solid var(--accent);
+  background:linear-gradient(160deg,rgba(var(--accent-rgb),.14),rgba(var(--accent-rgb),.03) 60%,transparent)}
 .hero .top{display:flex;align-items:stretch;gap:18px}
 .side{flex:1;display:flex;gap:18px;min-width:0}
 .side .txt{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
-.side .tag{font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.2em;color:var(--orange)}
+.side .tag{font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.2em;color:var(--accent)}
 .side .nm{font-family:'Oswald',sans-serif;font-weight:500;font-size:32px;line-height:1.05;
   color:var(--cream-80);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .side .rec{font-size:19px;color:var(--cream-50)}
@@ -88,7 +93,7 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 .up{color:var(--green)}.down{color:var(--red)}
 .bar{height:11px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden;
   display:flex;margin-top:18px}
-.bar .a{background:var(--orange)}.bar .b{flex:1;background:rgba(253,248,229,.32)}
+.bar .a{background:var(--accent)}.bar .b{flex:1;background:rgba(253,248,229,.32)}
 
 /* lineup */
 .lu{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0;
@@ -104,9 +109,9 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 .cell{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:10px;
   background:var(--panel);border:1px solid var(--line);min-width:0}
 .cell.r{flex-direction:row-reverse;text-align:right}
-.cell.win{background:linear-gradient(90deg,rgba(255,112,48,.18),rgba(255,112,48,.04));
-  border-color:rgba(255,112,48,.45)}
-.cell.r.win{background:linear-gradient(270deg,rgba(255,112,48,.18),rgba(255,112,48,.04))}
+.cell.win{background:linear-gradient(90deg,rgba(var(--accent-rgb),.18),rgba(var(--accent-rgb),.04));
+  border-color:rgba(var(--accent-rgb),.45)}
+.cell.r.win{background:linear-gradient(270deg,rgba(var(--accent-rgb),.18),rgba(var(--accent-rgb),.04))}
 .cell .p{font-family:'Oswald',sans-serif;font-weight:500;font-size:33px;
   min-width:78px;flex:0 0 auto}
 .cell.r .p{text-align:left}
@@ -144,7 +149,7 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 .m .t .n{font-family:'Oswald',sans-serif;font-size:26px;color:var(--cream-80);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .m .t .s{font-family:'Oswald',sans-serif;font-weight:500;font-size:32px;flex:0 0 auto}
-.m .t.lead .n,.m .t.lead .s{color:var(--orange)}
+.m .t.lead .n,.m .t.lead .s{color:var(--accent)}
 .m .t .rec{font-family:'Oswald',sans-serif;font-size:24px;color:var(--cream-50);flex:0 0 auto}
 .m .sep{font-size:17px;color:var(--cream-30);flex:0 0 auto}
 
@@ -158,8 +163,8 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 .trow{flex:1 1 0;min-height:var(--row-min,58px);max-height:var(--row-max,92px);
   border-radius:10px;
   background:var(--panel);border-left:5px solid transparent}
-.trow.me{background:linear-gradient(90deg,rgba(255,112,48,.20),rgba(255,112,48,.04));
-  border-left-color:var(--orange)}
+.trow.me{background:linear-gradient(90deg,rgba(var(--accent-rgb),.20),rgba(var(--accent-rgb),.04));
+  border-left-color:var(--accent)}
 .rk{font-family:'Oswald',sans-serif;font-size:26px;color:var(--cream-50)}
 .tn{font-family:'Oswald',sans-serif;font-size:27px;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
@@ -220,7 +225,7 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
    most of the table (ESPN, 7 of 12). A single line between the seeds instead. */
 .trow.cut{position:relative}
 .trow.cut::after{content:'';position:absolute;left:0;right:0;bottom:-5px;height:2px;
-  background:linear-gradient(90deg,rgba(255,112,48,.55),rgba(255,112,48,0))}
+  background:linear-gradient(90deg,rgba(var(--accent-rgb),.55),rgba(var(--accent-rgb),0))}
 
 /* Swap-zone rows are flex:1 1 0 inside a justify-content:center container.
    That is what stops slack pooling into a dead band under the last row, but it
