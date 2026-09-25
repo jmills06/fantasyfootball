@@ -28,6 +28,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+import nfl_schedule
+
 try:
     import truststore
 
@@ -287,19 +289,27 @@ def build(cfg, cookie):
     score_doc = request(view("mMatchupScore"), cookie)
     schedule = score_doc.get("schedule") or []
 
-    # Anchor on the latest matchup period that actually has points, so a
-    # midweek run shows the week that just finished rather than an empty one.
-    anchor = 1
-    for g in schedule:
-        mp = g.get("matchupPeriodId") or 0
-        if mp > current:
-            continue
-        pts = num((g.get("home") or {}).get("totalPoints")) \
-            + num((g.get("away") or {}).get("totalPoints")) \
-            + num((g.get("home") or {}).get("totalPointsLive")) \
-            + num((g.get("away") or {}).get("totalPointsLive"))
-        if pts > 0:
-            anchor = max(anchor, mp)
+    # Anchor on the league's current matchup period, which ESPN rolls forward
+    # by Tuesday morning (logs: currentMatchupPeriod=3 on a Tuesday while
+    # week 2 was final). That keeps the upcoming matchup on the board from
+    # Tuesday through the weekend. From Monday until the Tuesday 04:00 ET
+    # rollover, stay on the latest period with points instead, so an early
+    # roll never cuts off Monday night.
+    anchor = max(1, current)
+    if nfl_schedule.hold_previous_week():
+        scored = 0
+        for g in schedule:
+            mp = g.get("matchupPeriodId") or 0
+            if mp > current:
+                continue
+            pts = num((g.get("home") or {}).get("totalPoints")) \
+                + num((g.get("away") or {}).get("totalPoints")) \
+                + num((g.get("home") or {}).get("totalPointsLive")) \
+                + num((g.get("away") or {}).get("totalPointsLive"))
+            if pts > 0:
+                scored = max(scored, mp)
+        if scored:
+            anchor = scored
     print(f"  currentMatchupPeriod={current}, anchored on {anchor}")
 
     box = request(view("mBoxscore", scoringPeriodId=anchor), cookie)
@@ -529,6 +539,7 @@ def build(cfg, cookie):
                   "b": bench_total(box_away, anchor, slot_order)},
         "matchups": matchups,
         "upcoming": {"week": upcoming_week, "games": games},
+        "windows": nfl_schedule.game_windows(cfg["season"], anchor),
         "standings": standings,
         "moves": moves,
     }

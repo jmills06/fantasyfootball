@@ -10,8 +10,11 @@
 #   Body:    {"ref":"main"}
 #
 #   Two schedules, both hitting this same workflow:
-#     slow - every 6h, Mon-Sat
-#     fast - every 60-90s during Sunday game windows
+#     slow - every 6h, all week
+#     fast - every 60-90s during game windows: Thu ~8pm-12:30am ET,
+#            Sun ~12:30pm-12:30am ET, Mon ~8pm-12:30am ET
+#   The boards decide LIVE from the NFL schedule themselves (nfl_schedule.py);
+#   the fast schedule only controls how fresh the scores are while LIVE.
 #
 # The PAT lives in cron-job.org, never in this repo.
 
