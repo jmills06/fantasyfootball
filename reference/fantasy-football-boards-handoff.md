@@ -311,9 +311,11 @@ Standard pattern for this suite:
 - Separate board per league, identical styling. Not one combined screen.
 - No per-player stat lines. Points, name, NFL team only. This deliberately avoids
   Sleeper's undocumented stats endpoint.
-- No "yet to play" indicator on the Sleeper board. It would need an NFL schedule
-  source. Accepted consequence: a player who hasn't kicked off shows 0.0, identical
-  to one who played and scored nothing.
+- Each LIVE lineup cell shows the name, then `POS • TEAM`, then a game line from
+  the NFL scoreboard `nfl_schedule.py` already fetches: kickoff (e.g. `Sun 1:00 PM
+  @ MIA`), the clock while playing (`Q2 3:52 vs ATL`, in green), `Final`, or
+  `BYE`. (Revised 2026-09-25, owner request; previously there was no "yet to
+  play" indicator because no schedule source existed.)
 - Mode switches on the NFL schedule's game windows, not live game state.
   (Revised 2026-09-25, owner request; was day of week.)
 - Empty starter slots get their own row.

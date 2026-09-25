@@ -197,6 +197,23 @@ function heroSide(t, right){
     + '</div>';
 }
 
+/* Game line under each player, like the Sleeper app: kickoff in the
+   display's local time before the game, the clock while it is on, then Final.
+   Comes from the collector's copy of the NFL scoreboard, so the clock is as
+   fresh as the last collection (about 90s during a game window). */
+function gameLine(g){
+  if (!g) return null;
+  if (g.bye) return {txt: 'BYE', on: false};
+  const vs = (g.home ? 'vs ' : '@ ') + esc(g.opp);
+  if (g.st === 'in')   return {txt: esc(g.clk || 'Live') + ' ' + vs, on: true};
+  if (g.st === 'post') return {txt: esc(g.clk || 'Final') + ' ' + vs, on: false};
+  const k = new Date(g.kick);
+  if (isNaN(k)) return {txt: vs, on: false};
+  const day = k.toLocaleDateString('en-US', {weekday: 'short'});
+  const time = k.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'});
+  return {txt: day + ' ' + time + ' ' + vs, on: false};
+}
+
 function renderLineup(d){
   const rows = d.lineup.map(r => {
     const ap = num(r.a && r.a.p), bp = num(r.b && r.b.p);
@@ -207,9 +224,13 @@ function renderLineup(d){
              + '<div class="p">' + num(p && p.p).toFixed(1) + '</div>'
              + '<div class="n">Empty</div></div>';
       }
+      const gl = gameLine(p.g);
+      const game = gl ? '<div class="sub g' + (gl.on ? ' on' : '') + '">' + gl.txt + '</div>' : '';
       return '<div class="cell' + r2 + (win ? ' win' : '') + '">'
            + '<div class="p">' + num(p.p).toFixed(1) + '</div>'
-           + '<div class="n">' + esc(p.n) + '<em>' + esc(p.t) + '</em></div></div>';
+           + '<div class="n"><div class="nm">' + esc(p.n) + '</div>'
+           + '<div class="sub">' + [p.pos, p.t].filter(Boolean).map(esc).join(' &bull; ')
+           + '</div>' + game + '</div></div>';
     };
     return '<div class="slot">' + cell(r.a, 'a', ap > bp)
       + '<div class="pos' + (r.pos === 'FLEX' ? ' flex' : '') + '">' + esc(r.pos) + '</div>'

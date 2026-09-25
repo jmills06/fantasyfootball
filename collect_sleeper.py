@@ -257,6 +257,13 @@ def build(cfg, players):
         p = players.get(str(pid))
         return (p.get("t") or "") if p else ""
 
+    def pos_of(pid):
+        p = players.get(str(pid))
+        return (p.get("p") or "") if p else ""
+
+    # Each NFL team's game this week, for the lineup grid's game line.
+    games = nfl_schedule.team_games(cfg["season"], anchor)
+
     def slot_cell(entry, i):
         """One side of one lineup row.
 
@@ -273,7 +280,13 @@ def build(cfg, players):
         p = round(float(pts[i]), 2) if i < len(pts) else 0.0
         if pid in (0, "0", None, ""):
             return {"empty": True, "p": p}
-        return {"n": name_of(pid), "t": team_of(pid), "p": p}
+        cell = {"n": name_of(pid), "t": team_of(pid), "p": p}
+        if pos_of(pid):
+            cell["pos"] = pos_of(pid)
+        g = nfl_schedule.game_for(games, cell["t"])
+        if g:
+            cell["g"] = g
+        return cell
 
     lineup = [{"pos": slot, "a": slot_cell(mine, i), "b": slot_cell(opp, i)}
               for i, slot in enumerate(slots)]

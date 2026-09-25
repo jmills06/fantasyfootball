@@ -106,7 +106,7 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
   color:var(--cream-50);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slot{display:grid;grid-template-columns:1fr 78px 1fr;gap:12px;
   flex:1 1 0;min-height:var(--row-min,58px);max-height:var(--row-max,92px)}
-.cell{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:10px;
+.cell{display:flex;align-items:center;gap:14px;padding:8px 16px;border-radius:10px;
   background:var(--panel);border:1px solid var(--line);min-width:0}
 .cell.r{flex-direction:row-reverse;text-align:right}
 .cell.win{background:linear-gradient(90deg,rgba(var(--accent-rgb),.18),rgba(var(--accent-rgb),.04));
@@ -115,13 +115,15 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 .cell .p{font-family:'Oswald',sans-serif;font-weight:500;font-size:33px;
   min-width:78px;flex:0 0 auto}
 .cell.r .p{text-align:left}
-.cell .n{flex:1;min-width:0;font-family:'Oswald',sans-serif;font-weight:400;font-size:27px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cell .n em{font-style:normal;font-size:19px;color:var(--cream-30);margin-left:8px;
-  letter-spacing:.08em}
-.cell.r .n em{margin:0 0 0 8px}   /* was margin:0 8px 0 0 in the mock, which
-    left the abbreviation butted against the player name on the mirrored side;
-    .n is not itself reversed, so the text still flows name-then-abbrev. */
+.cell .n{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;
+  font-family:'Oswald',sans-serif;font-weight:400;font-size:27px}
+/* Three lines: name, then POS • TEAM, then the game line. Line heights are
+   explicit so a 92px row holds all three whatever font actually loads. */
+.cell .n>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .n .nm{line-height:1.12}
+.cell .n .sub{font-size:17px;line-height:1.22;letter-spacing:.06em;color:var(--cream-50)}
+.cell .n .sub.g{color:var(--cream-30)}
+.cell .n .sub.g.on{color:var(--green)}
 .cell.empty{background:rgba(255,255,255,.02);border-style:dashed;
   border-color:rgba(255,255,255,.16)}
 .cell.empty .p,.cell.empty .n{color:var(--cream-30)}
