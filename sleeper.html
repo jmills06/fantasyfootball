@@ -67,7 +67,9 @@ const AUTO_FIT        = true;     // scale the 1080x1920 stage to fill the displ
                                   // actual DAKboard is larger, so at 1:1 the board sat
                                   // in one corner. At exactly 1080x1920 the scale is 1
                                   // and this is a no-op. ?fit=0 forces 1:1.
-const LIVE_DAYS       = [0];      // 0=Sun. Add 4 for Thu night, 1 for Mon night.
+const LIVE_DAYS       = [0];      // fallback only, when the payload has no game
+                                  // windows (0=Sun). Normally the collector's
+                                  // NFL-schedule windows decide LIVE.
 const MODE_OVERRIDE   = null;     // 'live' | 'idle' forces a state
 const TICK_MS         = 60000;    // master tick: re-evaluates mode and redraws
 const REFRESH_MS      = 900000;   // data poll, idle
@@ -123,6 +125,16 @@ function currentMode(){
   const q = QS.get('mode');
   if (q === 'live' || q === 'idle') return q;
   if (MODE_OVERRIDE) return MODE_OVERRIDE;
+  // LIVE while any NFL game window is open (Thu night, Sunday, Mon night and
+  // any odd Saturday or holiday game), from the collector's copy of the NFL
+  // schedule. The windows are known in advance, so the flip lands on time
+  // even between idle polls. Older payloads without windows use LIVE_DAYS.
+  const w = data && data.windows;
+  if (Array.isArray(w)){
+    const now = Date.now();
+    return w.some(x => now >= Date.parse(x.start) && now < Date.parse(x.end))
+      ? 'live' : 'idle';
+  }
   return LIVE_DAYS.includes(new Date().getDay()) ? 'live' : 'idle';
 }
 
@@ -366,7 +378,7 @@ function render(){
   document.getElementById('lid').textContent = 'LEAGUE ' + LEAGUE_ID;
   document.getElementById('liveFlag').style.display = live ? 'flex' : 'none';
   document.getElementById('heroLabel').textContent =
-    live ? 'YOUR MATCHUP' : 'WEEK ' + num(d.week) + ' RESULT';
+    live ? 'YOUR MATCHUP' : 'WEEK ' + num(d.week) + ' MATCHUP';
   document.getElementById('mLabel').textContent =
     live ? 'AROUND THE LEAGUE' : 'WEEK ' + num(d.week) + ' MATCHUPS';
 

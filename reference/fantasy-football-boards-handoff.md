@@ -18,12 +18,18 @@ name and the data differ.
 
 Each board has two states:
 
-- **LIVE** (Sundays) — your matchup hero, then a head-to-head lineup grid of your
+- **LIVE** (NFL game windows: Thu night, Sunday, Mon night, plus any Saturday or
+  holiday game) — your matchup hero, then a head-to-head lineup grid of your
   starters vs your opponent's, then other games in progress. No transactions block.
-- **IDLE** (Mon–Sat) — your matchup hero relabelled to last week's result, then
-  standings, then next week's pairings, then latest roster moves.
+- **IDLE** (all other times) — this week's matchup hero, then standings, then the
+  week's matchups, then latest roster moves.
 
-Mode is decided by day of week on the master tick. Not by game state.
+Mode is decided on the master tick by whether the clock is inside one of the
+`windows` the collector writes from the NFL schedule (see `nfl_schedule.py`), not
+by live game state. Payloads without `windows` fall back to day of week.
+
+*Revised 2026-09-25 at the owner's request. Originally LIVE was Sundays only and
+IDLE showed last week's result until Thursday night.*
 
 ---
 
@@ -212,7 +218,10 @@ Still to confirm in discovery:
   breaks in the playoffs — postseason pairings live in `winners_bracket` and
   `losers_bracket`.
 - `/v1/state/nfl` returns both `week` and `display_week`, which diverge on Tuesdays.
-  **Anchor the IDLE board on the week that just finished**, not the upcoming one.
+  Both leagues roll their current week forward by Tuesday morning. **The boards
+  anchor on the league's current week from Tuesday 04:00 ET**, so the upcoming
+  matchup shows all week; from Monday until then they stay on the week with
+  points so Monday night is never cut off. (Revised 2026-09-25, owner request.)
 
 ### ESPN
 
@@ -285,8 +294,10 @@ Standard pattern for this suite:
 
 - GitHub Actions, triggered by **cron-job.org firing `workflow_dispatch`**. Built-in
   `schedule:` is unreliable here and should exist only as a commented backup.
-- **Two schedules:** slow (every 6h) Mon–Sat, fast (60–90s) during Sunday game
-  windows. Both hit the same workflow.
+- **One schedule:** every 30 minutes, all week. The workflow gates itself on the
+  NFL game windows (`python nfl_schedule.py <payloads>`): inside a window one run
+  loops every 90s until it closes; outside, it collects only when data is ~6h
+  old. (Revised 2026-09-25; was separate slow and fast cron-job.org schedules.) Both hit the same workflow.
 - **Git push race fix, mandatory:** `fetch-depth: 0` on checkout plus a 5-attempt
   rebase-retry loop (`git pull --rebase --autostash -X theirs origin main`). Two
   collectors writing `data/latest/` in one repo is exactly the case this guards.
@@ -303,10 +314,12 @@ Standard pattern for this suite:
 - No "yet to play" indicator on the Sleeper board. It would need an NFL schedule
   source. Accepted consequence: a player who hasn't kicked off shows 0.0, identical
   to one who played and scored nothing.
-- Mode switches on day of week, not game state.
+- Mode switches on the NFL schedule's game windows, not live game state.
+  (Revised 2026-09-25, owner request; was day of week.)
 - Empty starter slots get their own row.
-- IDLE anchors on the week that just finished; next week's pairings appear as the
-  bottom strip.
+- The board anchors on the current week from Tuesday 04:00 ET; the previous week
+  is not shown after that. (Revised 2026-09-25, owner request; was the week that
+  just finished.)
 - Team avatars/logos shown in hero, standings, and the compact matchup strip, but
   **not** in the head-to-head column headers.
 

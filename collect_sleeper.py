@@ -19,6 +19,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+import nfl_schedule
+
 try:
     import truststore
 
@@ -144,14 +146,17 @@ def build(cfg, players):
     for w in range(1, min(current + 1, 18) + 1):
         weeks[w] = get(f"{base}/v1/league/{lg}/matchups/{w}")
 
-    # Anchor on the latest week that has actually started. On a Tuesday the
-    # NFL state has already rolled forward while the new week is all zeros,
-    # so this naturally lands on the week that just finished - which is what
-    # the IDLE board is supposed to show.
-    anchor = 1
-    for w in sorted(weeks):
-        if w <= current and any(week_points(e) > 0 for e in weeks[w] or []):
-            anchor = w
+    # Anchor on the league's current week, which Sleeper rolls forward by
+    # Tuesday morning (logs: week=3 display_week=2 on a Tuesday). That keeps
+    # the upcoming matchup on the board from Tuesday through the weekend.
+    # From Monday until the Tuesday 04:00 ET rollover, stay on the latest
+    # week with points instead, so an early roll never cuts off Monday night.
+    anchor = max(1, current)
+    if nfl_schedule.hold_previous_week():
+        scored = [w for w in sorted(weeks)
+                  if w <= current and any(week_points(e) > 0 for e in weeks[w] or [])]
+        if scored:
+            anchor = scored[-1]
     print(f"anchor week: {anchor} (upcoming {anchor + 1})")
 
     # roster_positions is an ordered array, so the starting slots are just
@@ -187,9 +192,12 @@ def build(cfg, players):
     # fpts/fpts_decimal are deliberately not used: every value was 0 at
     # discovery so the decimal field's scale could not be verified, while
     # summing weekly points is exact and needs no assumption.
+    # Completed weeks only: the anchor week is the one being played (or about
+    # to be), so counting it would add partial points and turn an unplayed
+    # 0-0 into a tie in the streak.
     pf = {rid: 0.0 for rid in rosters_by_id}
     results = {rid: [] for rid in rosters_by_id}
-    for w in range(1, anchor + 1):
+    for w in range(1, anchor):
         for entries in pair_up(weeks.get(w)).values():
             if len(entries) != 2:
                 continue
@@ -405,6 +413,7 @@ def build(cfg, players):
         "bench": {"a": bench_total(mine), "b": bench_total(opp)},
         "matchups": matchups,
         "upcoming": {"week": upcoming_week, "games": games},
+        "windows": nfl_schedule.game_windows(cfg["season"], anchor),
         "standings": standings,
         "moves": moves,
     }
