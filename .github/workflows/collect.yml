@@ -9,12 +9,16 @@
 #            Accept: application/vnd.github+json
 #   Body:    {"ref":"main"}
 #
-#   Two schedules, both hitting this same workflow:
-#     slow - every 6h, all week
-#     fast - every 60-90s during game windows: Thu ~8pm-12:30am ET,
-#            Sun ~12:30pm-12:30am ET, Mon ~8pm-12:30am ET
-#   The boards decide LIVE from the NFL schedule themselves (nfl_schedule.py);
-#   the fast schedule only controls how fresh the scores are while LIVE.
+#   ONE schedule: every 30 minutes, every day. The workflow decides the rest
+#   from the NFL game windows in data/latest/*.json (nfl_schedule.py gate):
+#     - inside a game window (Thu night, Sunday, Mon night, any Saturday or
+#       holiday game) the run stays up and collects every LIVE_EVERY seconds
+#       until the window closes, capped at LIVE_MAX_MIN per run; the next
+#       30-minute trigger picks up where a capped run left off
+#     - outside a window it collects only if the data is ~6h old, and
+#       otherwise exits in seconds
+#   Triggers that arrive while a live run is going queue behind it (see
+#   `concurrency`) and show as cancelled in the Actions list. That is normal.
 #
 # The PAT lives in cron-job.org, never in this repo.
 
@@ -29,17 +33,29 @@ on:
         options: [all, sleeper, espn]
         default: all
         required: false
+      force:
+        description: Collect now even outside a game window
+        type: boolean
+        default: false
+        required: false
 
   # Backup only - do not rely on this. See the note above.
   # schedule:
-  #   - cron: '0 */6 * * *'
+  #   - cron: '*/30 * * * *'
 
 permissions:
   contents: write
 
+# One run at a time. A live run holds the slot for its window; a trigger that
+# arrives meanwhile waits, and newer ones replace older waiting ones.
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
 jobs:
   collect:
     runs-on: ubuntu-latest
+    timeout-minutes: 350        # GitHub's hard cap is 360
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,62 +72,97 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --quiet truststore
 
-      # Each collector runs independently and is allowed to fail. Partial data
-      # is still committed below, and the job is failed at the end. Both
-      # collectors preserve the previous file and set "stale" rather than
-      # writing an error state, so a failure never blanks a board.
-      - name: Collect Sleeper
-        id: sleeper
-        if: ${{ inputs.league == 'sleeper' || inputs.league == 'all' || inputs.league == '' }}
-        continue-on-error: true
-        run: python collect_sleeper.py
-
-      - name: Collect ESPN
-        id: espn
-        if: ${{ inputs.league == 'espn' || inputs.league == 'all' || inputs.league == '' }}
-        continue-on-error: true
+      - name: Collect and push
         env:
           # Full ESPN account access. Secrets only - never echo these, never
-          # pass them on a command line, never write them to a file.
+          # pass them on a command line, never write them to a file. The
+          # Sleeper collector is run with them unset.
           ESPN_S2: ${{ secrets.ESPN_S2 }}
           ESPN_SWID: ${{ secrets.ESPN_SWID }}
-        run: python collect_espn.py
-
-      - name: Commit and push
-        env:
           BRANCH: ${{ github.ref_name }}
+          LEAGUE: ${{ inputs.league }}
+          FORCE: ${{ inputs.force }}
+          LIVE_EVERY: 90
+          LIVE_MAX_MIN: 330
         run: |
-          set -euo pipefail
+          set -uo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          LEAGUE="${LEAGUE:-all}"
+          failed=0
 
-          git add data/latest assets/logos 2>/dev/null || true
-          if git diff --cached --quiet; then
-            echo "no changes to commit"
-            exit 0
-          fi
-          git commit -m "Update league data [skip ci]"
-
-          # Mandatory push-race guard (handoff section 9 / CLAUDE.md section 3).
-          # Two collectors writing data/latest/ in one repo is exactly the case
-          # this exists for. Five attempts, rebasing onto whatever landed first.
-          for i in 1 2 3 4 5; do
-            echo "push attempt $i"
-            if git push origin "HEAD:${BRANCH}"; then
-              echo "pushed"
-              exit 0
+          push_data() {
+            git add data/latest assets/logos 2>/dev/null || true
+            if git diff --cached --quiet; then
+              echo "no changes to commit"
+              return 0
             fi
-            git pull --rebase --autostash -X theirs origin "${BRANCH}" || true
-            sleep $((i * 3))
-          done
-          echo "push failed after 5 attempts"
-          exit 1
+            git commit -q -m "Update league data [skip ci]"
 
-      - name: Fail if a collector failed
-        if: ${{ steps.sleeper.outcome == 'failure' || steps.espn.outcome == 'failure' }}
-        run: |
-          echo "sleeper: ${{ steps.sleeper.outcome }}"
-          echo "espn:    ${{ steps.espn.outcome }}"
-          echo "Data that did collect has been committed; the boards show stale"
-          echo "rather than blanking. Check the step log above for the status code."
-          exit 1
+            # Mandatory push-race guard (handoff section 9 / CLAUDE.md section 3).
+            # Two collectors writing data/latest/ in one repo is exactly the case
+            # this exists for. Five attempts, rebasing onto whatever landed first.
+            for i in 1 2 3 4 5; do
+              echo "push attempt $i"
+              if git push origin "HEAD:${BRANCH}"; then
+                echo "pushed"
+                return 0
+              fi
+              git pull --rebase --autostash -X theirs origin "${BRANCH}" || true
+              sleep $((i * 3))
+            done
+            echo "push failed after 5 attempts"
+            return 1
+          }
+
+          # Each collector is allowed to fail. Both preserve the previous file
+          # and set "stale" rather than writing an error state, so a failure
+          # never blanks a board. Partial data is still pushed, and the job is
+          # failed at the end.
+          collect_once() {
+            if [ "$LEAGUE" = "all" ] || [ "$LEAGUE" = "sleeper" ]; then
+              env -u ESPN_S2 -u ESPN_SWID python collect_sleeper.py || failed=1
+            fi
+            if [ "$LEAGUE" = "all" ] || [ "$LEAGUE" = "espn" ]; then
+              python collect_espn.py || failed=1
+            fi
+            push_data || failed=1
+          }
+
+          read -r mode secs < <(python nfl_schedule.py data/latest/sleeper.json data/latest/espn.json)
+          mode="${mode:-idle}"   # gate could not run: collect once, as before
+          if [ "$FORCE" = "true" ] && [ "$mode" = "skip" ]; then mode=idle; fi
+          echo "gate: $mode ${secs}s"
+
+          case "$mode" in
+            live)
+              deadline=$(( $(date +%s) + LIVE_MAX_MIN * 60 ))
+              while :; do
+                started=$(date +%s)
+                collect_once
+                # The windows are rewritten on every collection, so re-check
+                # against the fresh payloads rather than the starting estimate.
+                read -r mode secs < <(python nfl_schedule.py data/latest/sleeper.json data/latest/espn.json)
+                now=$(date +%s)
+                if [ "$mode" != "live" ] || [ "$now" -ge "$deadline" ]; then
+                  echo "live loop done ($mode)"
+                  break
+                fi
+                wait_s=$(( LIVE_EVERY - (now - started) ))
+                [ "$wait_s" -gt 0 ] && sleep "$wait_s"
+              done
+              ;;
+            idle)
+              collect_once
+              ;;
+            *)
+              echo "outside game windows and data is fresh; nothing to do"
+              ;;
+          esac
+
+          if [ "$failed" -ne 0 ]; then
+            echo "A collector or push failed. Data that did collect has been"
+            echo "committed; the boards show stale rather than blanking. Check"
+            echo "the log above for the status code."
+            exit 1
+          fi

@@ -156,3 +156,47 @@ def game_windows(season, week, now=None):
     print(f"  nfl schedule: week {week}, {len(kicks)} kickoffs, "
           f"{len(windows)} windows ({source})")
     return windows
+
+
+# -------------------------------------------------------------------- gate
+
+SLOW_HOURS = 6    # outside game windows, refresh when data is this old
+
+
+def gate(paths, now=None):
+    """What one workflow run should do, from the payloads already on disk.
+
+    Returns ("live", seconds_left_in_window), ("idle", 0) or ("skip", 0).
+    One cron-job.org trigger every 30 minutes is all the workflow needs:
+    inside a game window the run stays up and collects on a short loop until
+    the window closes; outside one it collects only when the data is older
+    than SLOW_HOURS, and otherwise exits in seconds.
+    """
+    now = now or datetime.now(timezone.utc)
+    newest = None
+    live_end = None
+    for p in paths:
+        try:
+            with open(p, encoding="utf-8") as f:
+                doc = json.load(f)
+        except (OSError, ValueError):
+            continue
+        u = _parse_utc(str(doc.get("updated", ""))[:16] + "Z")
+        if u and (newest is None or u > newest):
+            newest = u
+        for w in doc.get("windows") or []:
+            s, e = _parse_utc(str(w.get("start", ""))[:16] + "Z"), \
+                   _parse_utc(str(w.get("end", ""))[:16] + "Z")
+            if s and e and s <= now < e:
+                live_end = max(live_end or e, e)
+    if live_end:
+        return "live", int((live_end - now).total_seconds())
+    if newest is None or now - newest >= timedelta(hours=SLOW_HOURS) - timedelta(minutes=5):
+        return "idle", 0
+    return "skip", 0
+
+
+if __name__ == "__main__":
+    import sys
+    mode, secs = gate(sys.argv[1:])
+    print(f"{mode} {secs}")
