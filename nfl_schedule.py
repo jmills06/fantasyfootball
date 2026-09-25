@@ -175,6 +175,7 @@ def gate(paths, now=None):
     now = now or datetime.now(timezone.utc)
     newest = None
     live_end = None
+    refresh = False
     for p in paths:
         try:
             with open(p, encoding="utf-8") as f:
@@ -184,6 +185,12 @@ def gate(paths, now=None):
         u = _parse_utc(str(doc.get("updated", ""))[:16] + "Z")
         if u and (newest is None or u > newest):
             newest = u
+        # Collect regardless of age when a payload cannot be trusted to carry
+        # this week's windows: written before windows existed, or before the
+        # latest Tuesday rollover (its windows are last week's). Without this
+        # the gate waits out SLOW_HOURS before it ever sees a game window.
+        if "windows" not in doc or not u or u < week_start(now):
+            refresh = True
         for w in doc.get("windows") or []:
             s, e = _parse_utc(str(w.get("start", ""))[:16] + "Z"), \
                    _parse_utc(str(w.get("end", ""))[:16] + "Z")
@@ -191,7 +198,8 @@ def gate(paths, now=None):
                 live_end = max(live_end or e, e)
     if live_end:
         return "live", int((live_end - now).total_seconds())
-    if newest is None or now - newest >= timedelta(hours=SLOW_HOURS) - timedelta(minutes=5):
+    if refresh or newest is None \
+            or now - newest >= timedelta(hours=SLOW_HOURS) - timedelta(minutes=5):
         return "idle", 0
     return "skip", 0
 
