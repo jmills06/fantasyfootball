@@ -99,23 +99,103 @@ def _parse_utc(s):
     return None
 
 
+_BOARDS = {}   # (season, week) -> scoreboard doc or None, one fetch per run
+
+
+def _scoreboard(season, week):
+    key = (str(season), week)
+    if key in _BOARDS:
+        return _BOARDS[key]
+    doc = None
+    if week and week <= 18:
+        url = SCOREBOARD.format(season=season, week=week)
+        req = urllib.request.Request(
+            url, headers={"User-Agent": UA, "Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                doc = json.loads(resp.read())
+        except (urllib.error.HTTPError, urllib.error.URLError, ValueError) as e:
+            kind = getattr(e, "code", None) or getattr(e, "reason", type(e).__name__)
+            print(f"  nfl schedule: week {week} unavailable ({kind})")
+    _BOARDS[key] = doc
+    return doc
+
+
 def _kickoffs(season, week):
-    url = SCOREBOARD.format(season=season, week=week)
-    req = urllib.request.Request(
-        url, headers={"User-Agent": UA, "Accept": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            doc = json.loads(resp.read())
-    except (urllib.error.HTTPError, urllib.error.URLError, ValueError) as e:
-        kind = getattr(e, "code", None) or getattr(e, "reason", type(e).__name__)
-        print(f"  nfl schedule: week {week} unavailable ({kind})")
-        return []
     out = []
-    for ev in doc.get("events") or []:
+    for ev in (_scoreboard(season, week) or {}).get("events") or []:
         k = _parse_utc(ev.get("date"))
         if k:
             out.append(k)
     return sorted(out)
+
+
+# Sleeper and older feeds use a few codes ESPN's scoreboard does not.
+TEAM_ALIASES = {"WAS": "WSH", "JAC": "JAX", "LA": "LAR", "OAK": "LV", "SD": "LAC"}
+
+
+def _game_state(status):
+    """Short status for the lineup grid: pre, or a clock like "Q2 3:52",
+    "Half", "End Q3", "OT 4:10", or "Final" / "Final/OT"."""
+    st = status or {}
+    t = st.get("type") or {}
+    state = t.get("state") or "pre"
+    name = str(t.get("name") or "")
+    period = st.get("period") or 0
+    clock = str(st.get("displayClock") or "")
+    q = "OT" if period > 4 else f"Q{period}"
+    if state == "in":
+        if "HALFTIME" in name:
+            return "in", "Half"
+        if "END_PERIOD" in name or clock in ("0:00", "00:00"):
+            return "in", f"End {q}"
+        return "in", f"{q} {clock}".strip() if period else "Live"
+    if state == "post":
+        if "POSTPONED" in name or "CANCELED" in name:
+            return "post", "Postponed"
+        return "post", "Final/OT" if period > 4 else "Final"
+    return "pre", ""
+
+
+def team_games(season, week):
+    """Each NFL team's game this week, keyed by team code.
+
+    {"GB": {"opp": "ATL", "home": false, "kick": "2026-09-25T00:15:00Z",
+            "st": "in", "clk": "Q2 3:52"}, ...}
+
+    A team missing from the map is on bye. Empty if the scoreboard could not
+    be fetched, in which case the board simply leaves the game line off.
+    """
+    out = {}
+    for ev in (_scoreboard(season, week) or {}).get("events") or []:
+        comp = (ev.get("competitions") or [{}])[0]
+        teams = comp.get("competitors") or []
+        if len(teams) != 2:
+            continue
+        kick = _parse_utc(ev.get("date"))
+        st, clk = _game_state(comp.get("status") or ev.get("status"))
+        codes = [str((c.get("team") or {}).get("abbreviation") or "") for c in teams]
+        for i, c in enumerate(teams):
+            me, opp = codes[i], codes[1 - i]
+            if not me:
+                continue
+            out[me] = {
+                "opp": opp,
+                "home": c.get("homeAway") == "home",
+                "kick": kick.strftime("%Y-%m-%dT%H:%M:%SZ") if kick else None,
+                "st": st,
+                "clk": clk,
+            }
+    return out
+
+
+def game_for(games, team):
+    """Look up one player's game. None if unknown team or no schedule;
+    {"bye": True} if the schedule loaded but the team is not playing."""
+    if not games or not team or team == "FA":
+        return None
+    g = games.get(TEAM_ALIASES.get(team, team))
+    return g if g else {"bye": True}
 
 
 def _fallback_kickoffs(now=None):

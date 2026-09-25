@@ -54,6 +54,9 @@ PRO_TEAMS = {
     28: "WSH", 29: "CAR", 30: "JAX", 33: "BAL", 34: "HOU",
 }
 
+# defaultPositionId -> display position, for the lineup grid's second line.
+POSITIONS = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "D/ST"}
+
 # Transaction types that are not roster moves worth showing.
 SKIP_TX = {"DRAFT"}
 
@@ -219,7 +222,7 @@ def player_points(player, week, projected=False):
     return 0.0
 
 
-def roster_rows(side, week, slot_order):
+def roster_rows(side, week, slot_order, games=None):
     """Map a team's starters onto the configured slot order.
 
     ESPN returns lineupSlotCounts as an unordered map, so unlike Sleeper's
@@ -239,12 +242,19 @@ def roster_rows(side, week, slot_order):
             continue
         e = pool.pop(0)
         p = (e.get("playerPoolEntry") or {}).get("player") or {}
-        rows.append({
+        row = {
             "n": p.get("fullName") or "Unknown",
             "t": PRO_TEAMS.get(p.get("proTeamId"), ""),
             "p": round(player_points(p, week), 2),
             "proj": round(player_points(p, week, projected=True), 2),
-        })
+        }
+        pos = POSITIONS.get(p.get("defaultPositionId"))
+        if pos:
+            row["pos"] = pos
+        g = nfl_schedule.game_for(games, row["t"])
+        if g:
+            row["g"] = g
+        rows.append(row)
     return rows
 
 
@@ -369,8 +379,9 @@ def build(cfg, cookie):
             box_home, box_away = (h, a) if h.get("teamId") == me else (a, h)
             break
 
-    a_rows = roster_rows(box_home, anchor, slot_order)
-    b_rows = roster_rows(box_away, anchor, slot_order)
+    games = nfl_schedule.team_games(cfg["season"], anchor)
+    a_rows = roster_rows(box_home, anchor, slot_order, games)
+    b_rows = roster_rows(box_away, anchor, slot_order, games)
     names = cfg["slotNames"]
     lineup = [{"pos": names.get(str(slot), str(slot)),
                "a": a_rows[i], "b": b_rows[i]}
