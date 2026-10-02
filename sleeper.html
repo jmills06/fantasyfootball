@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <title>Laces Out — Sleeper Board</title>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Source+Sans+Pro:wght@300;400;600&display=swap" rel="stylesheet">
+<!-- Webfonts load without blocking first paint: a render-blocking stylesheet
+     on a third-party host leaves the whole frame unpainted, which on the
+     DAKboard is a black screen, for as long as that request hangs. -->
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Source+Sans+Pro:wght@300;400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="assets/board.css">
 </head>
 <body>
@@ -74,6 +77,7 @@ const MODE_OVERRIDE   = null;     // 'live' | 'idle' forces a state
 const TICK_MS         = 60000;    // master tick: re-evaluates mode and redraws
 const REFRESH_MS      = 900000;   // data poll, idle
 const REFRESH_LIVE_MS = 90000;    // data poll, live
+const FETCH_TIMEOUT_MS = 20000;   // abandon a hung data request
 
 const MOVES_PX_PER_SEC = 18;   // scroll speed of the moves list
 const STRIP_ROWS       = 3;    // matchups visible at once before paging
@@ -93,6 +97,7 @@ const QS = new URLSearchParams(location.search);
 let data = null;        // last good payload; never cleared on a failed fetch
 let fetchFailed = false;
 let lastFetch = 0;
+let loading = false;    // one request in flight at a time
 let lastSig = '';       // signature check, so the DOM is not rebuilt needlessly
 let lastMovesSig = '';  // separate, so an unrelated data change does not restart the scroll
 let lastStripSig = '';  // same, for the matchup strip's page cycle
@@ -148,13 +153,20 @@ function fit(){
     stage.style.top = '0px';
     return;
   }
+  // A frame loaded while hidden reports a 0x0 viewport. Scaling to that gives
+  // scale(0): the board is drawn at zero size and the screen stays black
+  // until something re-fits it. Keep the last good fit instead; the master
+  // tick re-runs fit(), so the board recovers within a tick even if no
+  // resize event arrives when the frame is shown.
+  const w = innerWidth, h = innerHeight;
+  if (!(w > 0 && h > 0)) return;
   // Uniform scale, then centre on both axes so any aspect-ratio mismatch
   // letterboxes evenly against the black page background rather than
   // pinning the board to a corner.
-  const s = Math.min(innerWidth / 1080, innerHeight / 1920);
+  const s = Math.min(w / 1080, h / 1920);
   stage.style.transform = 'scale(' + s + ')';
-  stage.style.left = ((innerWidth  - 1080 * s) / 2) + 'px';
-  stage.style.top  = ((innerHeight - 1920 * s) / 2) + 'px';
+  stage.style.left = ((w - 1080 * s) / 2) + 'px';
+  stage.style.top  = ((h - 1920 * s) / 2) + 'px';
 }
 
 function clockOf(iso){
@@ -167,9 +179,16 @@ function clockOf(iso){
    DATA
    ============================================================ */
 async function load(){
+  if (loading) return;
+  loading = true;
   lastFetch = Date.now();
+  // Abort a request that hangs rather than leaving it open indefinitely;
+  // the failure path below keeps the last good board on screen.
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS) : 0;
   try {
-    const r = await fetch(DATA_URL + '?t=' + lastFetch, {cache:'no-store'});
+    const r = await fetch(DATA_URL + '?t=' + lastFetch,
+                          {cache:'no-store', signal: ctl ? ctl.signal : undefined});
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
     if (!j || !Array.isArray(j.lineup)) throw new Error('shape');
@@ -179,6 +198,9 @@ async function load(){
     // Preserve whatever is on screen. A blank board is the failure mode to
     // avoid; an old board with a quiet stale marker is not.
     fetchFailed = true;
+  } finally {
+    clearTimeout(timer);
+    loading = false;
   }
 }
 
@@ -430,12 +452,23 @@ function render(){
    MASTER TICK - one timer drives mode flips, polling and redraw
    ============================================================ */
 async function tick(){
+  fit();
   const interval = currentMode() === 'live' ? REFRESH_LIVE_MS : REFRESH_MS;
   if (!data || (Date.now() - lastFetch) >= interval) await load();
   render();
 }
 
 addEventListener('resize', fit);
+addEventListener('pageshow', fit);
+document.addEventListener('visibilitychange', fit);
+// The webfonts now arrive after first paint. Rebuild once when they do, so
+// the strip and moves windows are measured with the real font metrics.
+if (document.fonts && document.fonts.addEventListener){
+  document.fonts.addEventListener('loadingdone', () => {
+    lastSig = lastStripSig = lastMovesSig = '';
+    render();
+  });
+}
 fit();
 tick();
 setInterval(tick, TICK_MS);
