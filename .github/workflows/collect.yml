@@ -19,6 +19,8 @@
 #       otherwise exits in seconds
 #   Triggers that arrive while a live run is going queue behind it (see
 #   `concurrency`) and show as cancelled in the Actions list. That is normal.
+#   A live run shows "in progress" for hours by design; its log prints one
+#   heartbeat line per collection. Do not cancel it.
 #
 # The PAT lives in cron-job.org, never in this repo.
 
@@ -149,6 +151,11 @@ jobs:
                   break
                 fi
                 wait_s=$(( LIVE_EVERY - (now - started) ))
+                [ "$wait_s" -lt 0 ] && wait_s=0
+                # Heartbeat. Between collections the job only sleeps, which
+                # otherwise looks like a hung run in the Actions tab.
+                echo "$(TZ=America/New_York date +'%-I:%M %p ET') collected;" \
+                     "next in ${wait_s}s; game window open ~$(( secs / 3600 ))h$(( secs % 3600 / 60 ))m more"
                 [ "$wait_s" -gt 0 ] && sleep "$wait_s"
               done
               ;;
