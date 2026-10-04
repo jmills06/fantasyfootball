@@ -100,3 +100,17 @@ This is mandatory. A collector workflow without both of these is not done.
 - Set `ESPN_S2` and `ESPN_SWID` as environment variables, then open a
   fresh terminal before running - an already-open terminal will not see
   them.
+
+---
+
+## 5. Analytics overlay (owner's private system)
+
+`data/latest/analytics-sleeper.json` and `data/latest/analytics-espn.json` are pushed by the
+owner's private analytics machine (deploy key, this repo only). They hold only display numbers:
+win probability, projected/expected finals, players yet to play, playoff odds. No secrets, no
+strategy (waiver/trade/FAAB plans never leave the private system).
+
+- The boards fetch them separately and show one line under the matchup bar (`insightLine`).
+- **The boards must work unchanged when these files are missing, malformed, or stale** (older
+  than 30 min during live windows, 26 h otherwise) - the line simply hides.
+- The publisher follows rule 3: `git pull --rebase --autostash -X theirs` with 5 retries.

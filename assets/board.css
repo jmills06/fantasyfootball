@@ -254,3 +254,10 @@ html,body{background:#000;overflow:hidden;font-family:'Source Sans Pro',sans-ser
 .wait{flex:1 1 auto;display:flex;align-items:center;justify-content:center;
   font-family:'Oswald',sans-serif;font-size:26px;letter-spacing:.18em;
   color:var(--cream-30)}
+
+/* Optional analytics line under the matchup bar (see insightLine in the boards). */
+.hero .ins{font-family:'Oswald',sans-serif;font-size:19px;letter-spacing:.12em;color:var(--cream-50);
+  text-align:center;margin-top:12px;min-height:0}
+.hero .ins:empty{display:none}
+.hero .ins b{color:var(--cream);font-weight:500}
+.hero .ins .dot{color:var(--cream-30);padding:0 10px}

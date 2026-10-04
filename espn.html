@@ -36,6 +36,7 @@
           <div class="side right" id="sideB"></div>
         </div>
         <div class="bar"><div class="a" id="barA"></div><div class="b"></div></div>
+        <div class="ins" id="insight"></div>
       </div>
     </div>
 
@@ -85,6 +86,11 @@ const STRIP_GAP        = 9;    // must match the .mtrack gap in board.css
 const STRIP_PAGE_SEC   = 9;    // seconds each page is held
 
 const DATA_URL  = 'data/latest/espn.json';
+// Optional analytics from the owner's private system (live win probability, expected finals,
+// playoff odds). The board works exactly as before when the file is missing or stale.
+const ANALYTICS_URL = 'data/latest/analytics-espn.json';
+const ANALYTICS_MAX_AGE_LIVE_MS = 30 * 60 * 1000, ANALYTICS_MAX_AGE_MS = 26 * 60 * 60 * 1000;
+let analytics = null;
 const LEAGUE_ID = '1529795';
 
 /* Preview helpers. ?mode=live|idle and ?fit=1 let the board be reviewed in a
@@ -194,6 +200,10 @@ async function load(){
     if (!j || !Array.isArray(j.lineup)) throw new Error('shape');
     data = j;
     fetchFailed = false;
+    try {
+      const ra = await fetch(ANALYTICS_URL + '?t=' + lastFetch, {cache:'no-store', signal: ctl ? ctl.signal : undefined});
+      analytics = ra.ok ? await ra.json() : null;
+    } catch (e) { analytics = null; }
   } catch (e) {
     // Preserve whatever is on screen. A blank board is the failure mode to
     // avoid; an old board with a quiet stale marker is not.
@@ -406,6 +416,23 @@ function mountMoves(list){
   track.classList.add('rolling');
 }
 
+/* One line of analytics under the matchup bar (published by the owner's private system).
+   Hidden when absent or stale; nothing else on the board depends on it. */
+function insightLine(a, live){
+  if (!a || !a.updated) return '';
+  const age = Date.now() - Date.parse(a.updated);
+  if (!(age >= 0) || age > (live ? ANALYTICS_MAX_AGE_LIVE_MS : ANALYTICS_MAX_AGE_MS)) return '';
+  const p = v => Math.round(v * 100) + '%';
+  const parts = [];
+  if (a.win_prob != null) parts.push('WIN <b>' + p(a.win_prob) + '</b>');
+  if (a.me_exp != null && a.opp_exp != null)
+    parts.push((a.in_progress ? 'EXP ' : 'PROJ ') + num(a.me_exp).toFixed(1) + ' – ' + num(a.opp_exp).toFixed(1));
+  if (a.in_progress && a.me_to_play != null)
+    parts.push(a.me_to_play + ' VS ' + a.opp_to_play + ' TO PLAY');
+  if (a.playoff_pct != null) parts.push('PLAYOFFS ' + p(a.playoff_pct));
+  return parts.join('<span class="dot">·</span>');
+}
+
 function render(){
   const live = currentMode() === 'live';
   const stale = !!(data && data.stale) || fetchFailed;
@@ -419,7 +446,7 @@ function render(){
 
   // Signature check: skip the rebuild entirely when nothing changed, to avoid
   // reflow and animation restarts on the Pi.
-  const sig = live + '|' + stale + '|' + JSON.stringify(data);
+  const sig = live + '|' + stale + '|' + JSON.stringify(data) + '|' + JSON.stringify(analytics);
   if (sig === lastSig) return;
   lastSig = sig;
 
@@ -446,6 +473,8 @@ function render(){
   // Before kickoff both sides are 0.0; split the bar rather than dividing by zero.
   document.getElementById('barA').style.width =
     ((pa + pb) > 0 ? (pa / (pa + pb) * 100) : 50).toFixed(1) + '%';
+
+  document.getElementById('insight').innerHTML = insightLine(analytics, live);
 
   document.getElementById('swapZone').innerHTML =
     live ? renderLineup(d) : renderStandings(d);
