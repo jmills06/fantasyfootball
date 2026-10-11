@@ -1,13 +1,13 @@
 {
- "updated": "2026-10-11T15:46:10Z",
+ "updated": "2026-10-11T17:05:09Z",
  "week": 5,
  "in_progress": true,
- "win_prob": 0.759,
- "me_exp": 124.6,
- "opp_exp": 104.5,
- "me_to_play": 10,
- "opp_to_play": 9,
- "me_playing": 0,
- "opp_playing": 0,
+ "win_prob": 0.76,
+ "me_exp": 124.1,
+ "opp_exp": 104.0,
+ "me_to_play": 5,
+ "opp_to_play": 5,
+ "me_playing": 5,
+ "opp_playing": 4,
  "playoff_pct": 0.399
 }
