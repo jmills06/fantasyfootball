@@ -1,9 +1,9 @@
 {
- "updated": "2026-10-16T02:10:08Z",
+ "updated": "2026-10-16T02:15:09Z",
  "week": 6,
  "in_progress": true,
- "win_prob": 0.26,
- "me_exp": 128.5,
+ "win_prob": 0.256,
+ "me_exp": 128.1,
  "opp_exp": 147.0,
  "me_to_play": 9,
  "opp_to_play": 10,
