@@ -1,10 +1,10 @@
 {
- "updated": "2026-11-06T03:50:08Z",
+ "updated": "2026-11-06T03:55:08Z",
  "week": 9,
  "in_progress": true,
  "win_prob": 0.415,
- "me_exp": 127.2,
- "opp_exp": 133.2,
+ "me_exp": 127.0,
+ "opp_exp": 133.0,
  "me_to_play": 9,
  "opp_to_play": 9,
  "me_playing": 1,
